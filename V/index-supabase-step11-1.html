@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Profile Image Test</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f7f6;
+            color: #222;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: #f0f0f0;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .profile {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .profile img {
+            width: 160px;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 4px solid #63BA97;
+            background: #eee;
+        }
+
+        .profile-name {
+            margin-top: 12px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .profile-info {
+            margin-top: 5px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+            border: none;
+            padding: 13px;
+            border-radius: 10px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .login-btn {
+            background: #63BA97;
+            color: white;
+        }
+
+        .upload-btn {
+            background: #333;
+            color: white;
+        }
+
+        .logout-btn {
+            background: #eee;
+            color: #333;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 12px;
+            background: #f7f7f7;
+            border-radius: 10px;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>👤 Supabase Profile Test</h1>
+
+        <!-- STATUS -->
+        <div id="status" class="status">ยังไม่ได้ Login</div>
+
+        <!-- LOGIN SECTION -->
+        <div id="loginSection">
+            <input type="email" id="email" placeholder="Email" value="user1001@example.com">
+            <input type="password" id="password" placeholder="Password" value="Test@1001Fleet">
+            <button class="login-btn" id="loginBtn">🔐 Login</button>
+        </div>
+
+        <!-- USER SECTION -->
+        <div id="userSection" class="hidden">
+            <div class="profile">
+                <img id="profileImage" src="" alt="Profile">
+                <div class="profile-name" id="profileName">-</div>
+                <div class="profile-info" id="profileInfo">-</div>
+            </div>
+
+            <input type="file" id="profileInput" accept="image/jpeg,image/png,image/webp">
+            <button class="upload-btn" id="uploadBtn">📷 Upload / เปลี่ยนรูป Profile</button>
+            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+            <div id="result" class="result">รอการทำงาน...</div>
+        </div>
+    </div>
+</div>
+
+<!-- SUPABASE JS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    // =========================================================
+    // SUPABASE CONFIG
+    // =========================================================
+    const SUPABASE_URL = 'https://qwbkguzdxqeqzeshinjm.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_SC_Pqs7Z0hcKcmQaUMEHOw_KmqNKEuF';
+
+    // ดึง instance จาก window ป้องกัน linter error
+    const supabaseLib = window['supabase'] || window.supabase;
+    const supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // =========================================================
+    // ELEMENTS
+    // =========================================================
+    const statusEl = document.getElementById('status');
+    const loginSection = document.getElementById('loginSection');
+    const userSection = document.getElementById('userSection');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const profileInput = document.getElementById('profileInput');
+    const profileImage = document.getElementById('profileImage');
+    const profileName = document.getElementById('profileName');
+    const profileInfo = document.getElementById('profileInfo');
+    const resultEl = document.getElementById('result');
+
+    function setResult(message) {
+        resultEl.textContent = message;
+        console.log(message);
+    }
+
+    // =========================================================
+    // LOGIN
+    // =========================================================
+    loginBtn.addEventListener('click', login);
+
+    async function login() {
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!email || !password) {
+            alert('กรุณากรอก Email และ Password');
+            return;
+        }
+
+        loginBtn.disabled = true;
+        statusEl.textContent = 'กำลัง Login...';
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        loginBtn.disabled = false;
+
+        if (error) {
+            console.error(error);
+            statusEl.textContent = 'Login ไม่สำเร็จ ❌';
+            setResult('Login Error:\n' + error.message);
+            alert('Login ไม่สำเร็จ:\n' + error.message);
+            return;
+        }
+
+        console.log('Login สำเร็จ:', data);
+        statusEl.textContent = 'Login สำเร็จ ✅';
+        await loadUserProfile();
+    }
+
+    // =========================================================
+    // LOAD USER PROFILE
+    // =========================================================
+    async function loadUserProfile() {
+        const userRes = await supabaseClient.auth.getUser();
+        const user = userRes.data?.user;
+
+        if (userRes.error || !user) {
+            console.error(userRes.error);
+            return;
+        }
+
+        const { data: employee, error: employeeError } = await supabaseClient
+            .from('employees')
+            .select('*')
+            .eq('auth_user_id', user.id)
+            .single();
+
+        if (employeeError) {
+            console.error(employeeError);
+            setResult('ไม่พบ Employee ที่เชื่อมกับ Auth User\n\n' + employeeError.message);
+            return;
+        }
+
+        loginSection.classList.add('hidden');
+        userSection.classList.remove('hidden');
+
+        profileName.textContent = employee.name || '-';
+        profileInfo.textContent = `Employee ID: ${employee.employee_id} | Role: ${employee.role}`;
+        profileImage.src = employee.profile_image || 'https://via.placeholder.com/160?text=Profile';
+
+        setResult(
+            'Login สำเร็จ\n\n' +
+            `Email: ${user.email}\n` +
+            `User ID: ${user.id}\n` +
+            `Employee ID: ${employee.employee_id}\n` +
+            `Name: ${employee.name}\n` +
+            `Role: ${employee.role}\n` +
+            `Profile: ${employee.profile_image || 'ยังไม่มีรูป'}`
+        );
+    }
+
+    // =========================================================
+    // UPLOAD PROFILE IMAGE
+    // =========================================================
+    uploadBtn.addEventListener('click', uploadProfile);
+
+    async function uploadProfile() {
+        const file = profileInput.files[0];
+
+        if (!file) {
+            alert('กรุณาเลือกรูปก่อน');
+            return;
+        }
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('รองรับเฉพาะ JPG, PNG และ WEBP');
+            return;
+        }
+
+        const maxSize = 5 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('รูปต้องมีขนาดไม่เกิน 5 MB');
+            return;
+        }
+
+        const userRes = await supabaseClient.auth.getUser();
+        const user = userRes.data?.user;
+
+        if (userRes.error || !user) {
+            alert('กรุณา Login ก่อน');
+            return;
+        }
+
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'กำลัง Upload...';
+
+        try {
+            const filePath = `${user.id}/avatar.jpg`;
+
+            const { error: uploadError } = await supabaseClient
+                .storage
+                .from('profiles')
+                .upload(filePath, file, {
+                    contentType: file.type,
+                    cacheControl: '3600',
+                    upsert: true
+                });
+
+            if (uploadError) throw uploadError;
+
+            const publicDataRes = supabaseClient
+                .storage
+                .from('profiles')
+                .getPublicUrl(filePath);
+
+            const imageUrl = publicDataRes.data.publicUrl;
+
+            const { error: updateError } = await supabaseClient
+                .from('employees')
+                .update({ profile_image: imageUrl })
+                .eq('auth_user_id', user.id);
+
+            if (updateError) throw updateError;
+
+            profileImage.src = imageUrl + '?t=' + Date.now();
+            setResult('🎉 Upload สำเร็จ!\n\n' + `File: ${filePath}\n\n` + `URL:\n${imageUrl}`);
+            alert('เปลี่ยนรูป Profile สำเร็จแล้ว!');
+        } catch (error) {
+            console.error('Upload Error:', error);
+            setResult('❌ Upload ไม่สำเร็จ\n\n' + error.message);
+            alert('Upload ไม่สำเร็จ:\n\n' + error.message);
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = '📷 Upload / เปลี่ยนรูป Profile';
+        }
+    }
+
+    // =========================================================
+    // LOGOUT
+    // =========================================================
+    logoutBtn.addEventListener('click', logout);
+
+    async function logout() {
+        const { error } = await supabaseClient.auth.signOut();
+
+        if (error) {
+            console.error(error);
+            alert('Logout ไม่สำเร็จ:\n' + error.message);
+            return;
+        }
+
+        loginSection.classList.remove('hidden');
+        userSection.classList.add('hidden');
+        statusEl.textContent = 'Logout สำเร็จ ✅';
+        profileName.textContent = '-';
+        profileInfo.textContent = '-';
+        profileImage.src = '';
+        setResult('Logout สำเร็จ');
+    }
+
+    // =========================================================
+    // CHECK EXISTING SESSION & INIT
+    // =========================================================
+    async function checkSession() {
+        const sessionRes = await supabaseClient.auth.getSession();
+        const session = sessionRes.data?.session;
+
+        if (session) {
+            statusEl.textContent = 'พบ Session เดิม...';
+            await loadUserProfile();
+        }
+    }
+
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+        console.log('Auth Event:', event);
+    });
+
+    checkSession();
+</script>
+
+</body>
+</html>
