@@ -2900,158 +2900,513 @@ svg {
 }
 
 /* =========================================================
-   OFFICIAL PRINT (จัดรูปแบบเอกสารทางการเฉพาะตอนพิมพ์ PDF)
-   หน้าจอเว็บปกติจะไม่เปลี่ยน แต่ตอนสั่งพิมพ์จะกลายเป็นเอกสารทางการ
+   OFFICIAL PRINT
    ========================================================= */
 
 #official-print-area {
   display: none;
 }
 
-@media print {
-  /* เมื่อสั่งพิมพ์รายงานทางการ ให้ซ่อน UI หน้าเว็บทั้งหมด */
-  body.printing-official .app-layout,
-  body.printing-official .toast,
-  body.printing-official .modal {
-    display: none !important;
-  }
 
-  body.printing-official #official-print-area {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 10mm 12mm;
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-family: var(--font-sans) !important;
-  }
+@media print {
+
+  /* =======================================================
+     A4
+     ======================================================= */
 
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
-  }
-
-  /* หัวหนังสือราชการ / เอกสาร NT */
-  .doc-official-header {
-    border-bottom: 2px solid #000;
-    padding-bottom: 10px;
-    margin-bottom: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-
-  .doc-header-titles h2 {
-    font-size: 15pt;
-    font-weight: bold;
-    margin: 0 0 4px 0;
-    color: #000;
-  }
-
-  .doc-header-titles h3 {
-    font-size: 12pt;
-    font-weight: 600;
     margin: 0;
-    color: #333;
   }
 
-  .doc-header-meta {
-    font-size: 9pt;
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+
+    background: #ffffff !important;
+  }
+
+
+  /* ซ่อนหน้าเว็บปกติ */
+
+  body.printing-official .app-layout,
+  body.printing-official .toast,
+  body.printing-official .modal,
+  body.printing-official .mobile-bottom-actions {
+    display: none !important;
+  }
+
+
+  /* =======================================================
+     พื้นที่เอกสาร
+     ======================================================= */
+
+  body.printing-official #official-print-area {
+
+    display: block !important;
+
+    position: absolute;
+
+    left: 0;
+    top: 0;
+
+    width: 100%;
+
+    min-height: 297mm;
+
+    box-sizing: border-box;
+
+    /*
+      Word:
+      Top    ≈ 15.5mm
+      Right  ≈ 7.5mm
+      Bottom ≈ 5mm
+      Left   ≈ 20mm
+    */
+
+    padding:
+      15.5mm
+      7.5mm
+      5mm
+      20mm;
+
+    margin: 0;
+
+    background: #ffffff !important;
+
+    color: #000000 !important;
+
+    font-family:
+      "TH SarabunPSK",
+      "TH Sarabun New",
+      "TH Sarabun",
+      sans-serif !important;
+
+    font-size: 8pt;
+
+    line-height: 1.05;
+
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+
+  /* =======================================================
+     HEADER
+     ======================================================= */
+
+  .official-header {
+
+    width: 100%;
+
+    box-sizing: border-box;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    border-bottom: 2px solid #000000;
+
+    padding-bottom: 4px;
+
+    margin-bottom: 12px;
+
+    min-height: 16mm;
+  }
+
+
+  .official-header-left {
+
+    width: 62%;
+
+    min-width: 0;
+  }
+
+
+  .official-header-right {
+
+    width: 38%;
+
     text-align: right;
-    line-height: 1.5;
+
+    font-size: 7pt;
+
+    line-height: 1.45;
+
+    white-space: nowrap;
   }
 
-  /* กรอบสรุปผลตัวเลขสถิติ */
-  .doc-kpi-summary {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
 
-  .doc-kpi-box {
-    border: 1px solid #444;
-    padding: 8px;
-    text-align: center;
-    background: #f8fafc !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .doc-kpi-box span {
-    display: block;
-    font-size: 8.5pt;
-    color: #555;
-  }
-
-  .doc-kpi-box strong {
-    display: block;
-    font-size: 12pt;
+  .official-header-right span {
     font-weight: bold;
-    color: #000;
-    margin-top: 2px;
   }
 
-  /* หัวข้อย่อย */
-  .doc-section-title {
+
+  .company-name {
+
+    font-size: 13.5pt;
+
+    font-weight: bold;
+
+    line-height: 1;
+
+    margin:
+      0
+      0
+      4px
+      0;
+  }
+
+
+  .report-title {
+
     font-size: 11pt;
-    font-weight: bold;
-    margin: 14px 0 6px 0;
-    border-left: 4px solid #000;
-    padding-left: 6px;
+
+    font-weight: normal;
+
+    line-height: 1;
+
+    margin: 0;
   }
 
-  /* ตารางข้อมูลทางการ */
-  .doc-table {
+
+  /* =======================================================
+     KPI
+     ======================================================= */
+
+  .official-kpis {
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+
+    gap: 2.5mm;
+
+    margin-bottom: 6mm;
+  }
+
+
+  .official-kpi {
+
+    height: 13.5mm;
+
+    box-sizing: border-box;
+
+    border: 1px solid #555555;
+
+    background: #f1f4f6 !important;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    text-align: center;
+
+    padding: 1mm;
+  }
+
+
+  .official-kpi div {
+
+    font-size: 8pt;
+
+    line-height: 1;
+
+    margin-bottom: 1mm;
+  }
+
+
+  .official-kpi strong {
+
+    font-size: 8.5pt;
+
+    line-height: 1;
+
+    font-weight: normal;
+  }
+
+
+  /* =======================================================
+     SECTION TITLE
+     ======================================================= */
+
+  .official-section-title {
+
+    font-size: 9pt;
+
+    font-weight: bold;
+
+    margin:
+      0
+      0
+      2mm
+      0;
+
+    padding: 0;
+
+    border: none !important;
+
+    line-height: 1;
+  }
+
+
+  .fuel-title {
+
+    margin-top: 3mm;
+  }
+
+
+  /* =======================================================
+     TABLE
+     ======================================================= */
+
+  .official-table {
+
     width: 100%;
+
+    table-layout: fixed;
+
     border-collapse: collapse;
-    margin-bottom: 14px;
-    font-size: 9pt;
+
+    border-spacing: 0;
+
+    margin: 0;
+
+    font-family:
+      "TH SarabunPSK",
+      "TH Sarabun New",
+      "TH Sarabun",
+      sans-serif !important;
+
+    font-size: 8pt;
+
+    line-height: 0.95;
   }
 
-  .doc-table th,
-  .doc-table td {
-    border: 1px solid #333 !important;
-    padding: 5px 6px;
+
+  /* ทุกหัวตาราง + ข้อมูล = CENTER */
+
+  .official-table th,
+  .official-table td {
+
+    box-sizing: border-box;
+
+    border: 1px solid #444444 !important;
+
+    padding:
+      1.5mm
+      1mm;
+
+    vertical-align: middle;
+
+    text-align: center !important;
+
+    overflow-wrap: break-word;
+
+    word-break: normal;
   }
 
-  .doc-table th {
-    background-color: #f1f5f9 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    text-align: center;
+
+  /* หัวตาราง */
+
+  .official-table th {
+
+    height: 10mm;
+
+    background: #e9eef2 !important;
+
+    text-align: center !important;
+
+    vertical-align: middle;
+
     font-weight: bold;
+
+    line-height: 0.9;
   }
 
-  .doc-table tr {
+
+  /* ข้อมูลในตาราง */
+
+  .official-table td {
+
+    height: 15.5mm;
+
+    text-align: center !important;
+
+    vertical-align: middle;
+
+    line-height: 0.95;
+  }
+
+
+  /* บังคับ class เดิมให้ CENTER ด้วย */
+
+  .official-table .c,
+  .official-table .r {
+
+    text-align: center !important;
+  }
+
+
+  /* ไม่ให้แถวถูกตัดกลางหน้า */
+
+  .official-table tbody tr {
+
     page-break-inside: avoid;
   }
 
-  /* ส่วนลงนามอนุมัติ 3 ฝ่าย */
-  .doc-signatures {
-    margin-top: 35px;
-    display: table;
+
+  .official-table th,
+  .official-table td {
+
+    font-size: 8pt;
+  }
+
+
+  /* กรณีไม่มีข้อมูล */
+
+  .empty-row {
+
+    text-align: center !important;
+
+    vertical-align: middle !important;
+
+    height: 10mm !important;
+  }
+
+
+  /* =======================================================
+     SIGNATURE
+     ======================================================= */
+
+  .official-signatures {
+
     width: 100%;
+
+    display: grid;
+
+    grid-template-columns:
+      repeat(3, 1fr);
+
+    gap: 5mm;
+
+    margin-top: 26mm;
+
     page-break-inside: avoid;
   }
 
-  .doc-sign-col {
-    display: table-cell;
-    width: 33.33%;
+
+  .official-sign {
+
     text-align: center;
-    font-size: 9pt;
-    line-height: 1.7;
-    vertical-align: top;
+
+    font-size: 8pt;
+
+    line-height: 1.1;
+
+    min-width: 0;
   }
 
-  .doc-sign-line {
+
+  /* บรรทัดจุดบรรทัดแรก */
+
+  .signature-line {
+
     width: 75%;
-    margin: 35px auto 6px auto;
-    border-bottom: 1px dotted #000;
+
+    margin:
+      0
+      auto
+      3mm;
+
+    height: auto;
+
+    border: none !important;
+
+    text-align: center;
+
+    white-space: nowrap;
+
+    font-size: 8pt;
+
+    line-height: 1;
   }
+
+
+  /* บรรทัดจุดในวงเล็บ */
+
+  .signature-name {
+
+    white-space: nowrap;
+
+    font-size: 8pt;
+
+    line-height: 1;
+
+    margin-bottom: 2mm;
+
+    text-align: center;
+  }
+
+
+  /* ตำแหน่ง */
+
+  .signature-role {
+
+    font-size: 8pt;
+
+    font-weight: normal;
+
+    white-space: nowrap;
+
+    text-align: center;
+  }
+
+
+  /* วันที่ */
+
+  .signature-date {
+
+    font-size: 8pt;
+
+    margin-top: 2mm;
+
+    text-align: center;
+  }
+
+
+  /* =======================================================
+     ป้องกันการแตกหน้า
+     ======================================================= */
+
+  .official-header,
+  .official-kpis,
+  .official-section-title,
+  .official-table,
+  .official-signatures {
+
+    page-break-inside: avoid;
+  }
+
+
+  /* ปิดเงาจาก CSS หน้าเว็บ */
+
+  * {
+
+    box-shadow: none !important;
+
+    text-shadow: none !important;
+  }
+
 }
 
 /* =========================================================

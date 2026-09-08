@@ -2137,6 +2137,7 @@ function renderReports() {
 function printOfficialReport(month) {
   const data = monthData(month);
   const now = new Date();
+
   const dateFormatted =
     new Intl.DateTimeFormat('th-TH', {
       year: 'numeric',
@@ -2147,34 +2148,48 @@ function printOfficialReport(month) {
       timeZone: 'Asia/Bangkok',
     }).format(now) + ' น.';
 
-  const docNo = `NT-HH-${month.replace('-', '')}-${String(now.getDate()).padStart(2, '0')}`;
+  const docNo =
+    `NT-HH-${month.replace('-', '')}-${String(now.getDate()).padStart(2, '0')}`;
 
+  /* =========================================================
+     ตารางที่ 1 : รายการใช้ยานพาหนะ
+     ========================================================= */
   const usageRows = data.usages.slice(0, 25).map((item, idx) => `
     <tr>
-      <td style="text-align:center;">${idx + 1}</td>
-      <td style="text-align:center;">${thaiDate(item.date)}</td>
-      <td style="font-weight:bold;text-align:center;">${esc(item.plate)}</td>
+      <td>${idx + 1}</td>
+      <td>${thaiDate(item.date)}</td>
+      <td>${esc(item.plate)}</td>
       <td>${esc(item.driver)}</td>
       <td>${esc(item.department || '-')}</td>
-      <td style="text-align:right;">${number(mileage(item))} กม.</td>
+      <td>${number(item.startMileage)}</td>
+      <td>${number(item.endMileage)}</td>
+      <td>${number(mileage(item))} กม.</td>
       <td>${esc(item.purpose || '-')}</td>
     </tr>
   `).join('');
 
+  /* =========================================================
+     ตารางที่ 2 : รายการเบิกจ่ายน้ำมัน
+     ========================================================= */
   const fuelRows = data.fuels.slice(0, 20).map((item, idx) => `
     <tr>
-      <td style="text-align:center;">${idx + 1}</td>
-      <td style="text-align:center;">${thaiDate(item.date)}</td>
-      <td style="font-weight:bold;text-align:center;">${esc(item.plate)}</td>
+      <td>${idx + 1}</td>
+      <td>${thaiDate(item.date)}</td>
+      <td>${esc(item.plate)}</td>
       <td>${esc(item.driver)}</td>
-      <td style="text-align:center;">${esc(item.type)}</td>
-      <td style="text-align:right;">${number(item.liters, 2)}</td>
-      <td style="text-align:right;font-weight:bold;">${money(item.amount)}</td>
-      <td style="text-align:center;">${item.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}</td>
+      <td>${number(item.mileage)}</td>
+      <td>${esc(item.type || '-')}</td>
+      <td>${number(item.liters, 2)}</td>
+      <td>${money(item.amount)}</td>
+      <td>${item.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ'}</td>
     </tr>
   `).join('');
 
+  /* =========================================================
+     สร้างพื้นที่พิมพ์
+     ========================================================= */
   let printArea = document.querySelector('#official-print-area');
+
   if (!printArea) {
     printArea = document.createElement('div');
     printArea.id = 'official-print-area';
@@ -2182,100 +2197,265 @@ function printOfficialReport(month) {
   }
 
   printArea.innerHTML = `
-    <div class="doc-official-header">
-      <div class="doc-header-titles">
-        <h2>บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)</h2>
-        <h3>รายงานสรุปการใช้ยานพาหนะและน้ำมันเชื้อเพลิง ประจำเดือน ${thaiMonth(month)}</h3>
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
+    <div class="official-header">
+
+      <div class="official-header-left">
+
+        <div class="company-name">
+          บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)
+        </div>
+
+        <div class="report-title">
+          รายงานสรุปการใช้ยานพาหนะและน้ำมันเชื้อเพลิง
+          ประจำเดือน ${thaiMonth(month)}
+        </div>
+
       </div>
-      <div class="doc-header-meta">
-        <div><strong>เลขที่เอกสาร:</strong> ${docNo}</div>
-        <div><strong>วันที่พิมพ์:</strong> ${dateFormatted}</div>
-        <div><strong>สังกัด:</strong> สำนักงานบริการลูกค้า NT หัวหิน</div>
+
+      <div class="official-header-right">
+
+        <div>
+          <span>เลขที่เอกสาร:</span>
+          ${docNo}
+        </div>
+
+        <div>
+          <span>วันที่พิมพ์:</span>
+          ${dateFormatted}
+        </div>
+
+        <div>
+          <span>สังกัด:</span>
+          สำนักงานบริการลูกค้า NT หัวหิน
+        </div>
+
       </div>
+
     </div>
 
-    <div class="doc-kpi-summary">
-      <div class="doc-kpi-box">
-        <span>ระยะทางสะสมรวม</span>
-        <strong>${number(data.distance)} กม.</strong>
+
+    <!-- =====================================================
+         KPI SUMMARY
+         ===================================================== -->
+    <div class="official-kpis">
+
+      <div class="official-kpi">
+        <div>ระยะทางสะสมรวม</div>
+        <strong>
+          ${number(data.distance)} กม.
+        </strong>
       </div>
-      <div class="doc-kpi-box">
-        <span>ปริมาณน้ำมันรวม</span>
-        <strong>${number(data.liters, 2)} ลิตร</strong>
+
+      <div class="official-kpi">
+        <div>ปริมาณน้ำมันรวม</div>
+        <strong>
+          ${number(data.liters, 2)} ลิตร
+        </strong>
       </div>
-      <div class="doc-kpi-box">
-        <span>ค่าน้ำมันเชื้อเพลิงรวม</span>
-        <strong>${money(data.amount)}</strong>
+
+      <div class="official-kpi">
+        <div>ค่าน้ำมันเชื้อเพลิงรวม</div>
+        <strong>
+          ${money(data.amount)}
+        </strong>
       </div>
-      <div class="doc-kpi-box">
-        <span>อัตราสิ้นเปลืองเฉลี่ย</span>
-        <strong>${number(data.efficiency, 2)} กม./ลิตร</strong>
+
+      <div class="official-kpi">
+        <div>อัตราสิ้นเปลืองเฉลี่ย</div>
+        <strong>
+          ${number(data.efficiency, 2)} กม./ลิตร
+        </strong>
       </div>
+
     </div>
 
-    <div class="doc-section-title">1. รายการใช้ยานพาหนะ (จำนวน ${data.usages.length} รายการ)</div>
-    <table class="doc-table">
+
+    <!-- =====================================================
+         SECTION 1
+         ===================================================== -->
+    <div class="official-section-title">
+      1. รายการใช้ยานพาหนะ (จำนวน ${data.usages.length} รายการ)
+    </div>
+
+
+    <table class="official-table vehicle-table">
+
+      <colgroup>
+        <col style="width: 5.0%">
+        <col style="width: 12.3%">
+        <col style="width: 13.6%">
+        <col style="width: 16.0%">
+        <col style="width: 15.8%">
+        <col style="width: 12.3%">
+        <col style="width: 12.3%">
+        <col style="width: 13.6%">
+        <col style="width: 22.3%">
+      </colgroup>
+
       <thead>
         <tr>
-          <th style="width: 5%;">#</th>
-          <th style="width: 13%;">วันที่</th>
-          <th style="width: 14%;">ทะเบียนรถ</th>
-          <th style="width: 18%;">ผู้ขับขี่</th>
-          <th style="width: 18%;">หน่วยงาน</th>
-          <th style="width: 12%;">ระยะทาง</th>
-          <th style="width: 20%;">วัตถุประสงค์</th>
+          <th>ลำดับที่</th>
+          <th>วันที่</th>
+          <th>ทะเบียนรถ</th>
+          <th>ผู้ขับขี่</th>
+          <th>หน่วยงาน</th>
+          <th>ไมล์เริ่มต้น</th>
+          <th>ไมล์สิ้นสุด</th>
+          <th>ระยะทาง</th>
+          <th>วัตถุประสงค์</th>
         </tr>
       </thead>
+
       <tbody>
-        ${usageRows || '<tr><td colspan="7" style="text-align:center;">ไม่มีรายการใช้รถในเดือนนี้</td></tr>'}
+        ${
+          usageRows ||
+          `
+          <tr>
+            <td colspan="9" class="empty-row">
+              ไม่มีรายการใช้รถในเดือนนี้
+            </td>
+          </tr>
+          `
+        }
       </tbody>
+
     </table>
 
-    <div class="doc-section-title">2. รายการเบิกจ่ายน้ำมันเชื้อเพลิง (จำนวน ${data.fuels.length} รายการ)</div>
-    <table class="doc-table">
+
+    <!-- =====================================================
+         SECTION 2
+         ===================================================== -->
+    <div class="official-section-title fuel-title">
+      2. รายการเบิกจ่ายน้ำมันเชื้อเพลิง
+      (จำนวน ${data.fuels.length} รายการ)
+    </div>
+
+
+    <table class="official-table fuel-table">
+
+      <colgroup>
+        <col style="width: 5.0%">
+        <col style="width: 13.6%">
+        <col style="width: 14.8%">
+        <col style="width: 17.1%">
+        <col style="width: 13.6%">
+        <col style="width: 12.3%">
+        <col style="width: 13.6%">
+        <col style="width: 17.3%">
+        <col style="width: 16.0%">
+      </colgroup>
+
       <thead>
         <tr>
-          <th style="width: 5%;">#</th>
-          <th style="width: 13%;">วันที่</th>
-          <th style="width: 14%;">ทะเบียนรถ</th>
-          <th style="width: 18%;">ผู้บันทึก</th>
-          <th style="width: 12%;">ประเภท</th>
-          <th style="width: 12%;">จำนวน (ลิตร)</th>
-          <th style="width: 14%;">ยอดเงินรวม</th>
-          <th style="width: 12%;">สถานะ</th>
+          <th>ลำดับที่</th>
+          <th>วันที่</th>
+          <th>ทะเบียนรถ</th>
+          <th>ผู้บันทึก</th>
+          <th>เลขไมล์ที่เติม</th>
+          <th>ประเภท</th>
+          <th>จำนวน (ลิตร)</th>
+          <th>ยอดเงินรวม</th>
+          <th>สถานะ</th>
         </tr>
       </thead>
+
       <tbody>
-        ${fuelRows || '<tr><td colspan="8" style="text-align:center;">ไม่มีรายการเติมน้ำมันในเดือนนี้</td></tr>'}
+        ${
+          fuelRows ||
+          `
+          <tr>
+            <td colspan="9" class="empty-row">
+              ไม่มีรายการเติมน้ำมันในเดือนนี้
+            </td>
+          </tr>
+          `
+        }
       </tbody>
+
     </table>
 
-    <div class="doc-signatures">
-      <div class="doc-sign-col">
-        <div>ลงชื่อ............................................................</div>
-        <div class="doc-sign-line"></div>
-        <div>(............................................................)</div>
-        <div><strong>ผู้รายงาน / เจ้าหน้าที่ควบคุมยานพาหนะ</strong></div>
-        <div>วันที่ ......./......./.......</div>
+
+    <!-- =====================================================
+         SIGNATURE
+         ===================================================== -->
+    <div class="official-signatures">
+
+      <!-- ผู้รายงาน -->
+      <div class="official-sign">
+
+        <div class="signature-line">
+          ............................................................
+        </div>
+
+        <div class="signature-name">
+          (............................................................)
+        </div>
+
+        <div class="signature-role">
+          ผู้รายงาน / เจ้าหน้าที่ควบคุมยานพาหนะ
+        </div>
+
+        <div class="signature-date">
+          วันที่ ......./......./.......
+        </div>
+
       </div>
-      <div class="doc-sign-col">
-        <div>ลงชื่อ............................................................</div>
-        <div class="doc-sign-line"></div>
-        <div>(............................................................)</div>
-        <div><strong>ผู้ตรวจสอบ / หัวหน้างานยานพาหนะ</strong></div>
-        <div>วันที่ ......./......./.......</div>
+
+
+      <!-- ผู้ตรวจสอบ -->
+      <div class="official-sign">
+
+        <div class="signature-line">
+          ............................................................
+        </div>
+
+        <div class="signature-name">
+          (............................................................)
+        </div>
+
+        <div class="signature-role">
+          ผู้ตรวจสอบ / หัวหน้างานยานพาหนะ
+        </div>
+
+        <div class="signature-date">
+          วันที่ ......./......./.......
+        </div>
+
       </div>
-      <div class="doc-sign-col">
-        <div>ลงชื่อ............................................................</div>
-        <div class="doc-sign-line"></div>
-        <div>(............................................................)</div>
-        <div><strong>ผู้อนุมัติ / ผู้จัดการศูนย์บริการ NT</strong></div>
-        <div>วันที่ ......./......./.......</div>
+
+
+      <!-- ผู้อนุมัติ -->
+      <div class="official-sign">
+
+        <div class="signature-line">
+          ............................................................
+        </div>
+
+        <div class="signature-name">
+          (............................................................)
+        </div>
+
+        <div class="signature-role">
+          ผู้อนุมัติ / ผู้จัดการศูนย์บริการ NT
+        </div>
+
+        <div class="signature-date">
+          วันที่ ......./......./.......
+        </div>
+
       </div>
+
     </div>
   `;
 
+  /* =========================================================
+     สั่งพิมพ์
+     ========================================================= */
   document.body.classList.add('printing-official');
+
   window.print();
 
   window.addEventListener(
@@ -2283,177 +2463,8 @@ function printOfficialReport(month) {
     () => {
       document.body.classList.remove('printing-official');
     },
-    { once: true },
+    { once: true }
   );
-}
-
-function exportOfficialCsv(month) {
-  const data = monthData(month);
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('th-TH');
-
-  let csv = '';
-  csv += '"บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)"\n';
-  csv += `"รายงานสรุปการใช้ยานพาหนะและน้ำมันเชื้อเพลิง ประจำเดือน ${thaiMonth(month)}"\n`;
-  csv += `"วันที่ออกรายงาน: ${dateStr}","ผู้ออกรายงาน: ${state.user?.name || 'ผู้ดูแลระบบ'}"\n\n`;
-
-  csv += '"สรุปข้อมูลภาพรวม"\n';
-  csv += `"ระยะทางสะสมรวม (กม.)","${data.distance}","กิโลเมตร"\n`;
-  csv += `"ปริมาณน้ำมันรวม (ลิตร)","${data.liters.toFixed(2)}","ลิตร"\n`;
-  csv += `"ค่าน้ำมันรวม (บาท)","${data.amount.toFixed(2)}","บาท"\n`;
-  csv += `"อัตราสิ้นเปลืองเฉลี่ย","${data.efficiency.toFixed(2)}","กม./ลิตร"\n\n`;
-
-  csv += '"=== ส่วนที่ 1: รายการใช้ยานพาหนะ ==="\n';
-  const usageHeaders = ['ลำดับ', 'วันที่', 'ทะเบียนรถ', 'ผู้ขับขี่', 'หน่วยงาน', 'เวลาไป', 'เวลากลับ', 'ไมล์เริ่มต้น', 'ไมล์สิ้นสุด', 'ระยะทาง (กม.)', 'วัตถุประสงค์'];
-  csv += usageHeaders.map((h) => `"${h}"`).join(',') + '\n';
-
-  data.usages.forEach((item, idx) => {
-    const row = [
-      idx + 1,
-      item.date,
-      item.plate,
-      item.driver,
-      item.department || '-',
-      item.depart || '-',
-      item.return || '-',
-      item.startMileage,
-      item.endMileage,
-      mileage(item),
-      item.purpose || '-',
-    ];
-    csv += row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
-  });
-
-  csv += '\n"=== ส่วนที่ 2: รายการเติมน้ำมันเชื้อเพลิง ==="\n';
-  const fuelHeaders = ['ลำดับ', 'วันที่', 'ทะเบียนรถ', 'ผู้บันทึก', 'ประเภทน้ำมัน', 'เลขไมล์', 'ลิตร', 'ยอดเงิน (บาท)', 'วิธีชำระ', 'สถานะ'];
-  csv += fuelHeaders.map((h) => `"${h}"`).join(',') + '\n';
-
-  data.fuels.forEach((item, idx) => {
-    const row = [
-      idx + 1,
-      item.date,
-      item.plate,
-      item.driver,
-      item.type,
-      item.mileage,
-      item.liters,
-      item.amount,
-      item.payment,
-      item.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ',
-    ];
-    csv += row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
-  });
-
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `NT_Fleet_Report_${month}_${now.toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-
-  toast('ส่งออกรายงาน Excel (CSV) ทางการเรียบร้อย');
-}
-
-/* =========================================================
-   AUDIT LOGS
-   ========================================================= */
-function renderAudit() {
-  document.querySelector('#page').innerHTML = `
-    ${pageHead('Audit Log', 'บันทึกการดำเนินการของผู้ใช้งานภายในระบบ')}
-    <section class="card">
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>วันและเวลา</th>
-              <th>ผู้ใช้งาน</th>
-              <th>การดำเนินการ</th>
-              <th>รายละเอียด</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              db.audit.length
-                ? db.audit
-                    .map(
-                      (item) => `
-                        <tr>
-                          <td>
-                            ${new Intl.DateTimeFormat('th-TH', {
-                              dateStyle: 'medium',
-                              timeStyle: 'short',
-                            }).format(new Date(item.time))}
-                          </td>
-                          <td>${esc(item.actor)}</td>
-                          <td>${esc(item.action)}</td>
-                          <td>${esc(item.detail)}</td>
-                        </tr>
-                      `,
-                    )
-                    .join('')
-                : `<tr><td colspan="4" class="empty">ยังไม่มีประวัติการดำเนินการ</td></tr>`
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
-}
-
-/* =========================================================
-   ADMIN USERS MANAGEMENT
-   ========================================================= */
-let cachedEmployees = [];
-
-async function renderAdminUsers() {
-  const page = document.querySelector('#page');
-  page.innerHTML = `
-    ${pageHead(
-      'จัดการผู้ใช้งานและสิทธิ์',
-      'ตรวจสอบรายชื่อพนักงาน แก้ไขบทบาท (User/Admin) และอัปโหลดเปลี่ยนรูปโปรไฟล์',
-      `<button class="button" id="btn-add-user" type="button">+ เพิ่มพนักงานใหม่</button>`
-    )}
-    <section class="card">
-      <div class="filter-bar">
-        <input id="user-search-input" placeholder="ค้นหาตามชื่อ หรือรหัสพนักงาน..." />
-        <select id="user-role-filter">
-          <option value="">ทุกสิทธิ์การใช้งาน</option>
-          <option value="admin">ผู้ดูแลระบบ (admin)</option>
-          <option value="user">พนักงานทั่วไป (user)</option>
-        </select>
-        <button class="ghost-button" id="btn-refresh-users" type="button">↻ รีเฟรช</button>
-      </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 70px;">รูปโปรไฟล์</th>
-              <th>รหัสพนักงาน</th>
-              <th>ชื่อ-นามสกุล</th>
-              <th>เบอร์โทรศัพท์</th>
-              <th>สิทธิ์การใช้งาน</th>
-              <th>วันที่สร้าง</th>
-              <th style="text-align: center;">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody id="admin-users-table-body">
-            <tr><td colspan="7" class="empty">กำลังโหลดข้อมูลพนักงาน...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
-
-  await loadAndRenderUsersTable();
-
-  document.querySelector('#user-search-input')?.addEventListener('input', filterUsersTable);
-  document.querySelector('#user-role-filter')?.addEventListener('change', filterUsersTable);
-  document.querySelector('#btn-refresh-users')?.addEventListener('click', loadAndRenderUsersTable);
-  document.querySelector('#btn-add-user')?.addEventListener('click', () => openUserEditModal(null));
 }
 
 async function loadAndRenderUsersTable() {
