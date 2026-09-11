@@ -2911,11 +2911,11 @@ svg {
 @media print {
 
   /* =======================================================
-     A4
+     A4 แนวนอน (Landscape)
      ======================================================= */
 
   @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 0;
   }
 
@@ -2940,7 +2940,7 @@ svg {
 
 
   /* =======================================================
-     พื้นที่เอกสาร
+     พื้นที่เอกสาร (A4 แนวนอน กว้าง 297mm สูง 210mm)
      ======================================================= */
 
   body.printing-official #official-print-area {
@@ -2954,23 +2954,23 @@ svg {
 
     width: 100%;
 
-    min-height: 297mm;
+    min-height: 210mm;
 
     box-sizing: border-box;
 
     /*
-      Word:
-      Top    ≈ 15.5mm
-      Right  ≈ 7.5mm
-      Bottom ≈ 5mm
-      Left   ≈ 20mm
+      ระยะขอบสำหรับกระดาษแนวนอน:
+      Top    ≈ 10mm
+      Right  ≈ 14mm
+      Bottom ≈ 8mm
+      Left   ≈ 14mm
     */
 
     padding:
-      15.5mm
-      7.5mm
-      5mm
-      20mm;
+      10mm
+      14mm
+      8mm
+      14mm;
 
     margin: 0;
 
@@ -3013,7 +3013,7 @@ svg {
 
     padding-bottom: 4px;
 
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 
     min-height: 16mm;
   }
@@ -3085,15 +3085,15 @@ svg {
     grid-template-columns:
       repeat(4, minmax(0, 1fr));
 
-    gap: 2.5mm;
+    gap: 3mm;
 
-    margin-bottom: 6mm;
+    margin-bottom: 5mm;
   }
 
 
   .official-kpi {
 
-    height: 13.5mm;
+    height: 11mm;
 
     box-sizing: border-box;
 
@@ -3220,7 +3220,7 @@ svg {
 
   .official-table th {
 
-    height: 10mm;
+    height: 8mm;
 
     background: #e9eef2 !important;
 
@@ -3238,7 +3238,7 @@ svg {
 
   .official-table td {
 
-    height: 15.5mm;
+    height: 9mm;
 
     text-align: center !important;
 
@@ -3280,7 +3280,7 @@ svg {
 
     vertical-align: middle !important;
 
-    height: 10mm !important;
+    height: 8mm !important;
   }
 
 
@@ -3297,9 +3297,9 @@ svg {
     grid-template-columns:
       repeat(3, 1fr);
 
-    gap: 5mm;
+    gap: 10mm;
 
-    margin-top: 26mm;
+    margin-top: 14mm;
 
     page-break-inside: avoid;
   }
@@ -3321,7 +3321,7 @@ svg {
 
   .signature-line {
 
-    width: 75%;
+    width: 60%;
 
     margin:
       0

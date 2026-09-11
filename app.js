@@ -2229,7 +2229,7 @@ function printOfficialReport(month) {
 
         <div>
           <span>สังกัด:</span>
-          สำนักงานบริการลูกค้า NT หัวหิน
+          บกน.2(ปข.)
         </div>
 
       </div>
