@@ -2467,6 +2467,178 @@ function printOfficialReport(month) {
   );
 }
 
+/* =========================================================
+   EXPORT CSV (Excel)
+   ========================================================= */
+function exportOfficialCsv(month) {
+  const data = monthData(month);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('th-TH');
+
+  let csv = '';
+  csv += '"บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)"\n';
+  csv += `"รายงานสรุปการใช้ยานพาหนะและน้ำมันเชื้อเพลิง ประจำเดือน ${thaiMonth(month)}"\n`;
+  csv += `"วันที่ออกรายงาน: ${dateStr}","ผู้ออกรายงาน: ${state.user?.name || 'ผู้ดูแลระบบ'}"\n\n`;
+
+  csv += '"สรุปข้อมูลภาพรวม"\n';
+  csv += `"ระยะทางสะสมรวม (กม.)","${data.distance}","กิโลเมตร"\n`;
+  csv += `"ปริมาณน้ำมันรวม (ลิตร)","${data.liters.toFixed(2)}","ลิตร"\n`;
+  csv += `"ค่าน้ำมันรวม (บาท)","${data.amount.toFixed(2)}","บาท"\n`;
+  csv += `"อัตราสิ้นเปลืองเฉลี่ย","${data.efficiency.toFixed(2)}","กม./ลิตร"\n\n`;
+
+  csv += '"=== ส่วนที่ 1: รายการใช้ยานพาหนะ ==="\n';
+  const usageHeaders = ['ลำดับ', 'วันที่', 'ทะเบียนรถ', 'ผู้ขับขี่', 'หน่วยงาน', 'เวลาไป', 'เวลากลับ', 'ไมล์เริ่มต้น', 'ไมล์สิ้นสุด', 'ระยะทาง (กม.)', 'วัตถุประสงค์'];
+  csv += usageHeaders.map((h) => `"${h}"`).join(',') + '\n';
+
+  data.usages.forEach((item, idx) => {
+    const row = [
+      idx + 1,
+      item.date,
+      item.plate,
+      item.driver,
+      item.department || '-',
+      item.depart || '-',
+      item.return || '-',
+      item.startMileage,
+      item.endMileage,
+      mileage(item),
+      item.purpose || '-',
+    ];
+    csv += row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+  });
+
+  csv += '\n"=== ส่วนที่ 2: รายการเติมน้ำมันเชื้อเพลิง ==="\n';
+  const fuelHeaders = ['ลำดับ', 'วันที่', 'ทะเบียนรถ', 'ผู้บันทึก', 'ประเภทน้ำมัน', 'เลขไมล์', 'ลิตร', 'ยอดเงิน (บาท)', 'วิธีชำระ', 'สถานะ'];
+  csv += fuelHeaders.map((h) => `"${h}"`).join(',') + '\n';
+
+  data.fuels.forEach((item, idx) => {
+    const row = [
+      idx + 1,
+      item.date,
+      item.plate,
+      item.driver,
+      item.type,
+      item.mileage,
+      item.liters,
+      item.amount,
+      item.payment,
+      item.approved ? 'อนุมัติแล้ว' : 'รออนุมัติ',
+    ];
+    csv += row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+  });
+
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `NT_Fleet_Report_${month}_${now.toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  toast('ส่งออกรายงาน Excel (CSV) ทางการเรียบร้อย');
+}
+
+/* =========================================================
+   AUDIT LOGS
+   ========================================================= */
+function renderAudit() {
+  document.querySelector('#page').innerHTML = `
+    ${pageHead('Audit Log', 'บันทึกการดำเนินการของผู้ใช้งานภายในระบบ')}
+    <section class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>วันและเวลา</th>
+              <th>ผู้ใช้งาน</th>
+              <th>การดำเนินการ</th>
+              <th>รายละเอียด</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              db.audit.length
+                ? db.audit
+                    .map(
+                      (item) => `
+                        <tr>
+                          <td>
+                            ${new Intl.DateTimeFormat('th-TH', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }).format(new Date(item.time))}
+                          </td>
+                          <td>${esc(item.actor)}</td>
+                          <td>${esc(item.action)}</td>
+                          <td>${esc(item.detail)}</td>
+                        </tr>
+                      `,
+                    )
+                    .join('')
+                : `<tr><td colspan="4" class="empty">ยังไม่มีประวัติการดำเนินการ</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+/* =========================================================
+   ADMIN USERS MANAGEMENT
+   ========================================================= */
+let cachedEmployees = [];
+
+async function renderAdminUsers() {
+  const page = document.querySelector('#page');
+  page.innerHTML = `
+    ${pageHead(
+      'จัดการผู้ใช้งานและสิทธิ์',
+      'ตรวจสอบรายชื่อพนักงาน แก้ไขบทบาท (User/Admin) และอัปโหลดเปลี่ยนรูปโปรไฟล์',
+      `<button class="button" id="btn-add-user" type="button">+ เพิ่มพนักงานใหม่</button>`
+    )}
+    <section class="card">
+      <div class="filter-bar">
+        <input id="user-search-input" placeholder="ค้นหาตามชื่อ หรือรหัสพนักงาน..." />
+        <select id="user-role-filter">
+          <option value="">ทุกสิทธิ์การใช้งาน</option>
+          <option value="admin">ผู้ดูแลระบบ (admin)</option>
+          <option value="user">พนักงานทั่วไป (user)</option>
+        </select>
+        <button class="ghost-button" id="btn-refresh-users" type="button">↻ รีเฟรช</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 70px;">รูปโปรไฟล์</th>
+              <th>รหัสพนักงาน</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>เบอร์โทรศัพท์</th>
+              <th>สิทธิ์การใช้งาน</th>
+              <th>วันที่สร้าง</th>
+              <th style="text-align: center;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="admin-users-table-body">
+            <tr><td colspan="7" class="empty">กำลังโหลดข้อมูลพนักงาน...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+
+  await loadAndRenderUsersTable();
+
+  document.querySelector('#user-search-input')?.addEventListener('input', filterUsersTable);
+  document.querySelector('#user-role-filter')?.addEventListener('change', filterUsersTable);
+  document.querySelector('#btn-refresh-users')?.addEventListener('click', loadAndRenderUsersTable);
+  document.querySelector('#btn-add-user')?.addEventListener('click', () => openUserEditModal(null));
+}
+
 async function loadAndRenderUsersTable() {
   const tbody = document.querySelector('#admin-users-table-body');
   if (!tbody) return;
