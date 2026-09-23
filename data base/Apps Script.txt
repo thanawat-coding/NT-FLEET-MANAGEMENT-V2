@@ -1,0 +1,312 @@
+/*
+ * NT Fleet Management System - Google Apps Script API
+ *
+ * วิธีใช้
+ * 1) นำไฟล์ Excel ในโฟลเดอร์นี้เข้า Google Sheets
+ * 2) เปิด Extensions > Apps Script แล้ววางโค้ดนี้ลงใน Code.gs
+ * 3) Deploy > New deployment > Web app
+ *    - Execute as: Me
+ *    - Who has access: บุคคลในองค์กรที่กำหนด หรือ Anyone ตามนโยบายของหน่วยงาน
+ * 4) คัดลอก URL ที่ลงท้ายด้วย /exec ไปใส่ใน config.js ของเว็บ
+ * 5) สร้าง QR Code ของรถแต่ละคัน โดย URL ต้องมี ?vehicleId=CAR001 เป็นต้น
+ *
+ * หมายเหตุ: การใช้รหัสพนักงานเพียงอย่างเดียวเป็นการตรวจสอบตัวตนระดับต้นแบบ
+ * หากใช้จริง ควรเพิ่ม Google Workspace SSO, PIN หรือระบบยืนยันตัวตนขององค์กร
+ */
+
+const SHEETS = Object.freeze({
+  employees: {
+    name: 'Employees',
+    headers: ['employeeId', 'name', 'role'],
+    seed: [
+      ['1204', 'ธนวัฒน์ กุลน้อย', 'user'],
+      ['1234', 'อนิรุตม์ บุญฉิม', 'admin'],
+      ['1208', 'ภาคิน โค้วเจริญ', 'user'],
+    ],
+  },
+  vehicles: {
+    name: 'Vehicles',
+    headers: ['vehicleId', 'plate', 'model', 'status', 'department'],
+    seed: [
+      ['CAR001', 'กข-1234', 'Toyota Hilux', 'พร้อมใช้งาน', 'สำนักงานหัวหิน'],
+      ['CAR002', 'ตต-5678', 'BMW', 'พร้อมใช้งาน', 'สำนักงานหัวหิน'],
+      ['CAR003', 'ฮก-6767', 'Honda', 'พร้อมใช้งาน', 'สำนักงานหัวหิน'],
+    ],
+  },
+  usages: {
+    name: 'Usages',
+    headers: ['id', 'employeeId', 'date', 'driver', 'plate', 'department', 'depart', 'return', 'startMileage', 'endMileage', 'purpose', 'note', 'createdAt', 'updatedAt'],
+    seed: [],
+  },
+  fuels: {
+    name: 'Fuels',
+    headers: ['id', 'employeeId', 'date', 'driver', 'plate', 'mileage', 'type', 'liters', 'amount', 'payment', 'receiptUrl', 'approved', 'createdAt', 'updatedAt'],
+    seed: [],
+  },
+  services: {
+    name: 'Services',
+    headers: ['id', 'employeeId', 'date', 'plate', 'mileage', 'serviceType', 'note', 'createdAt', 'updatedAt'],
+    seed: [],
+  },
+  audit: {
+    name: 'Audit',
+    headers: ['id', 'time', 'actor', 'employeeId', 'action', 'detail'],
+    seed: [],
+  },
+});
+
+const WRITE_RESOURCES = Object.freeze({ usage: 'usages', fuel: 'fuels', service: 'services' });
+
+function setupSheet() {
+  Object.keys(SHEETS).forEach(function (key) {
+    const config = SHEETS[key];
+    const sheet = getOrCreateSheet_(config);
+    const lastRow = sheet.getLastRow();
+
+    // ไม่ล้างข้อมูลเดิม เพื่อป้องกันการสูญหายของข้อมูลเมื่อรันคำสั่งนี้ซ้ำ
+    if (lastRow < 1) {
+      sheet.getRange(1, 1, 1, config.headers.length).setValues([config.headers]);
+    }
+
+    if (sheet.getLastRow() === 1 && config.seed.length) {
+      sheet.getRange(2, 1, config.seed.length, config.headers.length).setValues(config.seed);
+    }
+
+    sheet.setFrozenRows(1);
+    sheet.autoResizeColumns(1, config.headers.length);
+  });
+
+  return json_({ success: true, message: 'ตรวจสอบโครงสร้าง Google Sheet เรียบร้อย' });
+}
+
+function doGet(e) {
+  try {
+    const action = clean_(e && e.parameter && e.parameter.action).toLowerCase();
+
+    if (action === 'vehicle') return getVehicle_(clean_(e.parameter.vehicleId));
+    if (action === 'login') return login_(clean_(e.parameter.employeeId), clean_(e.parameter.vehicleId));
+    if (action === 'list') return list_(clean_(e.parameter.resource), clean_(e.parameter.employeeId));
+    if (action === 'ping' || !action) return json_({ success: true, message: 'NT Fleet Google Sheets API is running' });
+
+    return json_({ success: false, message: 'ไม่รู้จักคำสั่งที่ร้องขอ' });
+  } catch (error) {
+    return error_(error);
+  }
+}
+
+function doPost(e) {
+  try {
+    const payload = parsePayload_(e);
+    const action = clean_(payload.action).toLowerCase();
+
+    if (action === 'save') return save_(payload);
+    if (action === 'delete') return delete_(payload);
+    if (action === 'approvefuel') return approveFuel_(payload);
+
+    return json_({ success: false, message: 'ไม่รู้จักคำสั่งที่ร้องขอ' });
+  } catch (error) {
+    return error_(error);
+  }
+}
+
+function login_(employeeId, vehicleId) {
+  if (!employeeId) return json_({ success: false, message: 'กรุณาระบุรหัสพนักงาน' });
+  if (!vehicleId) return json_({ success: false, message: 'ไม่พบรหัสรถจาก QR Code' });
+
+  const employee = findEmployee_(employeeId);
+  if (!employee) return json_({ success: false, message: 'ไม่พบรหัสพนักงานนี้ในระบบ' });
+  if (!['user', 'admin'].includes(clean_(employee.role).toLowerCase())) return json_({ success: false, message: 'สิทธิ์ของพนักงานไม่ถูกต้อง' });
+
+  const vehicle = findVehicle_(vehicleId);
+  if (!vehicle) return json_({ success: false, message: 'ไม่พบข้อมูลรถคันนี้ในระบบ' });
+  if (clean_(vehicle.status) === 'กำลังซ่อมบำรุง') return json_({ success: false, message: `รถ ${vehicle.plate} อยู่ระหว่างซ่อมบำรุง` });
+
+  return json_({
+    success: true,
+    user: { employeeId: clean_(employee.employeeId), name: clean_(employee.name), role: clean_(employee.role).toLowerCase() },
+    vehicle: vehicle,
+  });
+}
+
+function getVehicle_(vehicleId) {
+  if (!vehicleId) return json_({ success: false, message: 'กรุณาระบุ vehicleId' });
+  const vehicle = findVehicle_(vehicleId);
+  if (!vehicle) return json_({ success: false, message: 'ไม่พบข้อมูลรถคันนี้ในระบบ' });
+  return json_({ success: true, vehicle: vehicle });
+}
+
+function list_(resource, employeeId) {
+  const key = normalizeListResource_(resource);
+  if (!key) return json_({ success: false, message: 'resource ไม่ถูกต้อง' });
+
+  const actor = findEmployee_(employeeId);
+  if (!actor) return json_({ success: false, message: 'ไม่พบรหัสพนักงานในระบบ' });
+  const isAdmin = clean_(actor.role).toLowerCase() === 'admin';
+  if (key === 'audit' && !isAdmin) return json_({ success: false, message: 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถดู Audit Log ได้' });
+
+  let data = objectRows_(key);
+  if (!isAdmin && ['usages', 'fuels', 'services'].includes(key)) {
+    data = data.filter(function (row) { return clean_(row.employeeId) === clean_(employeeId); });
+  }
+
+  return json_({ success: true, data: data });
+}
+
+function save_(payload) {
+  const key = WRITE_RESOURCES[clean_(payload.resource).toLowerCase()];
+  if (!key) return json_({ success: false, message: 'ประเภทข้อมูลไม่ถูกต้อง' });
+
+  const actor = requireEmployee_(payload.employeeId);
+  const record = payload.record || {};
+  const sheet = getOrCreateSheet_(SHEETS[key]);
+  const headers = SHEETS[key].headers;
+  const existing = clean_(record.id) ? findRowById_(sheet, clean_(record.id)) : null;
+
+  if (existing && !canEdit_(actor, existing.data)) return json_({ success: false, message: 'คุณไม่มีสิทธิ์แก้ไขรายการนี้' });
+
+  const now = new Date().toISOString();
+  const normalized = normalizeRecord_(key, record, actor, existing && existing.data, now);
+  if (clean_(actor.role).toLowerCase() !== 'admin') {
+    const scannedVehicle = findVehicle_(clean_(payload.vehicleId));
+    if (!scannedVehicle) return json_({ success: false, message: 'ไม่พบข้อมูลรถจาก QR Code' });
+    normalized.plate = clean_(scannedVehicle.plate);
+  }
+  validateRecord_(key, normalized);
+  const values = headers.map(function (header) { return normalized[header] === undefined ? '' : normalized[header]; });
+
+  if (existing) sheet.getRange(existing.row, 1, 1, headers.length).setValues([values]);
+  else sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([values]);
+
+  appendAudit_(actor, existing ? 'แก้ไขข้อมูล' : 'บันทึกข้อมูล', `${key}: ${normalized.plate || normalized.id}`);
+  return json_({ success: true, record: normalized });
+}
+
+function delete_(payload) {
+  const key = WRITE_RESOURCES[clean_(payload.resource).toLowerCase()];
+  if (!key) return json_({ success: false, message: 'ประเภทข้อมูลไม่ถูกต้อง' });
+
+  const actor = requireEmployee_(payload.employeeId);
+  const sheet = getOrCreateSheet_(SHEETS[key]);
+  const existing = findRowById_(sheet, clean_(payload.id));
+  if (!existing) return json_({ success: false, message: 'ไม่พบรายการที่ต้องการลบ' });
+  if (!canEdit_(actor, existing.data)) return json_({ success: false, message: 'คุณไม่มีสิทธิ์ลบรายการนี้' });
+
+  sheet.deleteRow(existing.row);
+  appendAudit_(actor, 'ลบข้อมูล', `${key}: ${payload.id}`);
+  return json_({ success: true });
+}
+
+function approveFuel_(payload) {
+  const actor = requireEmployee_(payload.employeeId);
+  if (clean_(actor.role).toLowerCase() !== 'admin') return json_({ success: false, message: 'เฉพาะผู้ดูแลระบบเท่านั้นที่อนุมัติรายการได้' });
+
+  const sheet = getOrCreateSheet_(SHEETS.fuels);
+  const existing = findRowById_(sheet, clean_(payload.id));
+  if (!existing) return json_({ success: false, message: 'ไม่พบรายการเติมน้ำมัน' });
+
+  const headers = SHEETS.fuels.headers;
+  existing.data.approved = true;
+  existing.data.updatedAt = new Date().toISOString();
+  sheet.getRange(existing.row, 1, 1, headers.length).setValues([headers.map(function (header) { return existing.data[header] === undefined ? '' : existing.data[header]; })]);
+  appendAudit_(actor, 'อนุมัติรายการเติมน้ำมัน', `${existing.data.plate}: ${existing.data.id}`);
+  return json_({ success: true });
+}
+
+function normalizeRecord_(key, incoming, actor, existing, now) {
+  const isAdmin = clean_(actor.role).toLowerCase() === 'admin';
+  const result = Object.assign({}, existing || {});
+  Object.keys(incoming || {}).forEach(function (keyName) { result[keyName] = incoming[keyName]; });
+
+  result.id = clean_(result.id) || Utilities.getUuid();
+  result.employeeId = existing ? clean_(existing.employeeId) : clean_(actor.employeeId);
+  if (!isAdmin || !clean_(result.driver)) result.driver = clean_(actor.name);
+  if (!existing) result.createdAt = now;
+  result.updatedAt = now;
+
+  if (key === 'fuels') {
+    result.approved = isAdmin && String(result.approved).toLowerCase() === 'true';
+    // รูปสลิปต้องเก็บใน Google Drive แล้วบันทึก URL ลง receiptUrl ในการใช้งานจริง
+    if (clean_(result.receiptUrl) === '' && /^https?:\/\//.test(clean_(result.receipt))) result.receiptUrl = clean_(result.receipt);
+  }
+
+  return result;
+}
+
+function validateRecord_(key, record) {
+  if (!clean_(record.date) || !clean_(record.plate)) throw new Error('กรุณาระบุวันที่และทะเบียนรถให้ครบถ้วน');
+  if (key === 'usages') {
+    const startMileage = Number(record.startMileage);
+    const endMileage = Number(record.endMileage);
+    if (!clean_(record.driver) || !clean_(record.depart) || !clean_(record.return) || !clean_(record.purpose)) throw new Error('กรุณากรอกข้อมูลการใช้รถให้ครบถ้วน');
+    if (!Number.isFinite(startMileage) || !Number.isFinite(endMileage) || endMileage < startMileage) throw new Error('เลขไมล์ไม่ถูกต้อง');
+  }
+  if (key === 'fuels' && (!Number.isFinite(Number(record.mileage)) || Number(record.liters) <= 0 || Number(record.amount) <= 0)) throw new Error('ข้อมูลการเติมน้ำมันไม่ถูกต้อง');
+  if (key === 'services' && (!Number.isFinite(Number(record.mileage)) || !clean_(record.serviceType))) throw new Error('ข้อมูลการเช็คระยะไม่ถูกต้อง');
+}
+
+function canEdit_(actor, record) { return clean_(actor.role).toLowerCase() === 'admin' || clean_(actor.employeeId) === clean_(record.employeeId); }
+function requireEmployee_(employeeId) { const employee = findEmployee_(employeeId); if (!employee) throw new Error('ไม่พบรหัสพนักงานในระบบ'); return employee; }
+function findEmployee_(employeeId) { return objectRows_('employees').find(function (row) { return clean_(row.employeeId) === clean_(employeeId); }) || null; }
+function findVehicle_(vehicleId) { return objectRows_('vehicles').find(function (row) { return clean_(row.vehicleId) === clean_(vehicleId); }) || null; }
+
+function findRowById_(sheet, id) {
+  if (!id) return null;
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) return null;
+  const headers = values[0];
+  const idIndex = headers.indexOf('id');
+  if (idIndex < 0) return null;
+  for (let index = 1; index < values.length; index += 1) {
+    if (clean_(values[index][idIndex]) === id) return { row: index + 1, data: rowToObject_(headers, values[index]) };
+  }
+  return null;
+}
+
+function objectRows_(key) {
+  const config = SHEETS[key];
+  if (!config) return [];
+  const sheet = getOrCreateSheet_(config);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const headers = values[0];
+  return values.slice(1).filter(function (row) { return row.some(function (cell) { return clean_(cell) !== ''; }); }).map(function (row) { return rowToObject_(headers, row); });
+}
+
+function rowToObject_(headers, row) { return headers.reduce(function (result, header, index) { result[header] = normalizeCell_(header, row[index]); return result; }, {}); }
+function normalizeCell_(header, value) {
+  if (!(value instanceof Date)) return value;
+  const timezone = Session.getScriptTimeZone();
+  if (header === 'date') return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
+  if (header === 'depart' || header === 'return') return Utilities.formatDate(value, timezone, 'HH:mm');
+  return Utilities.formatDate(value, timezone, "yyyy-MM-dd'T'HH:mm:ss'Z'");
+}
+function normalizeListResource_(resource) { const alias = { vehicle: 'vehicles', vehicles: 'vehicles', usage: 'usages', usages: 'usages', fuel: 'fuels', fuels: 'fuels', service: 'services', services: 'services', audit: 'audit' }; return alias[clean_(resource).toLowerCase()] || ''; }
+
+function appendAudit_(actor, action, detail) {
+  const sheet = getOrCreateSheet_(SHEETS.audit);
+  const entry = [Utilities.getUuid(), new Date().toISOString(), clean_(actor.name), clean_(actor.employeeId), action, detail];
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, entry.length).setValues([entry]);
+}
+
+function getOrCreateSheet_(config) {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(config.name);
+  if (!sheet) sheet = ss.insertSheet(config.name);
+  if (sheet.getLastRow() < 1) sheet.getRange(1, 1, 1, config.headers.length).setValues([config.headers]);
+  return sheet;
+}
+
+function getSpreadsheet_() {
+  const configuredId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  return configuredId ? SpreadsheetApp.openById(configuredId) : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function parsePayload_(e) {
+  const raw = e && e.postData && e.postData.contents;
+  if (!raw) return e && e.parameter ? e.parameter : {};
+  try { return JSON.parse(raw); } catch (ignore) { return e.parameter || {}; }
+}
+
+function clean_(value) { return String(value === undefined || value === null ? '' : value).trim(); }
+function json_(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
+function error_(error) { console.error(error); return json_({ success: false, message: error && error.message ? error.message : 'เกิดข้อผิดพลาดในระบบ' }); }

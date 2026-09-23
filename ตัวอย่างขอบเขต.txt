@@ -1,0 +1,43 @@
+1. ระบบหน้าบ้าน (Front-End Scope)
+เน้นเรื่อง User Experience (UX), User Interface (UI) และการเชื่อมต่อข้อมูลกับระบบหลังบ้าน
+การรองรับอุปกรณ์ (Responsive Design): ปรับแสดงผลได้สมบูรณ์ทั้งบน Desktop, Tablet และ
+Mobile
+ระบบจัดการบัญชีผู้ใช้ (User Authentication & Profile):
+๐ สมัครสมาชิก / เข้าสู่ระบบบ / ลืมรหัสผ่าน (รองรับ Email หรือ Social Login)
+๐ หน้าจัดการโปรไฟล์ส่วนตัว (แก้ไขข้อมูล, เปลี่ยนรหัสผ่าน)
+ส่วนแสดงผลหลัก (Core UI & Navigation):
+o หน้าแรก (Landing Page)/ หน้าหมวดหมู่/หน้าคันหา
+ระบบตัวกรองข้อมูล (Filter, Search, Sorting)
+0 ระบบแสดงผลรายการแบบเปิดอ่านละเอียด (Detail View)
+๐ การจัดการฟอร์มและการโต้ตอบ (Forms & Interaction):
+การตรวจสอบความถูกต้องของข้อมูลฝั่ง Client (Client-side Validation)
+o ระบบแจ้งเตือนสถานะการทำงาน (Toast notifications, Modal dialogue, Loading states)
+๐ ประสิทธิภาพและ SEO (Performance & Basic SEO):
+รองรับ Meta Tags / Open Graph สำหรับการแชร์บน Social Media
+๐ การลดขนาดไฟล์ภาพและการทำ Caching เพื่อความเร็วในการโหลด
+2. ระบบหลังบ้าน (Back-End Scope)
+เน้นเรื่อง Logic ของธุรกิจ, การประมวลผล, การจัดเก็บข้อมูล และความปลอดภัย
+ㅇ การจัดเก็บและบริหารข้อมูล(Database Management):
+การออกแบบโครงสร้างฐานข้อมูล (Database Schema Design)
+รองรับการทำงาน CRUD (Create, Read, Update, Delete) พื้นฐานของทุก Entity
+๐ ระบบสิทธิ์และการยืนยันตัวตน (Auth & Authorization):
+ㅇ การรับส่ง Token (เช่น JWT หรือ Session-based)
+การจำกัดสิทธิ์ตามบทบาท (Role-Based Access Control - RBAC) เช่น User, Editor, Admin
+ㅇ การสร้าง API (API Development):
+ㅇ พัฒนา RESTful API หรือ GraphQL สำหรับส่ง-รับข้อมูลกับหน้าบ้าน
+ระบบจัดการ Error Handling และ API Response Format fife.
+ระบบความปลอดภัยของเครื่องเชิร์ฟเวอร์ (Security Basics):
+๐ การเข้ารหัสรหัสผ่าน (Password Hashing เช่น bcrypt / Argon2)
+๐ การป้องกันช่องโหว่พื้นฐาน (SQL Injection, XSS, CSRF, CORS Policy)
+การจำกัดจำนวน Request (Rate Limiting)
+ㅇ การจัดการไฟล์(File / Media Management):
+๐ ระบบอัปโหลด รูปภาพ/เอกสาร (พร้อมการจำกัดขนาดและประเภทไฟล์)
+การเชื่อมต่อ Storage (เช่น Local Storage หรือ Cloud Storage อย่าง AWS S3, Cloudflare
+R2)
+3. ระบบผู้ดูแลระบบ (Admin Back-Office)
+เป็นส่วนการทำงานหลังบ้านที่มี UI ให้ทีมงานหรือ Admin เข้าไปจัดการข้อมูล
+o Dashboard สรุปภาพรวม: แสดงข้อมูลลถิติสำคัญ (เช่น จำนวนผู้ใช้งาน, รายการล่าสุด, กราฟสรุปผล)
+o ระบบจัดการข้อมูลผู้ใช้ (User Management): ดูรายการ, ระงับใช้งาน, ปรับเปลี่ยนสิทธิ์/Role
+ระบบจัดการเนื้อหา/สินค้า(Content / Data Management): เพิ่ม ลบ แก้ไข ข้อมูลหลักของระบบ
+o ระบบบันทึกประวัติ (Audit / Activity Logs): บันทึกว่าใครทำอะไร เมื่อไหร่ ในระบบ เพื่อตรวจสอบ
+ย้อนหลัง
