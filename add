@@ -1,0 +1,87 @@
+-- เพิ่มคอลัมน์ fleet_card_balance (ยอดเงินคงเหลือ) และ fleet_card_number (เลขบัตร)
+
+ALTER TABLE vehicles
+
+ADD COLUMN IF NOT EXISTS fleet_card_balance NUMERIC DEFAULT 0,
+
+ADD COLUMN IF NOT EXISTS fleet_card_number TEXT DEFAULT '';
+
+styles.css =
+/* =========================================================
+   FLEET CARD DISPLAY & MANAGEMENT STYLES
+   ========================================================= */
+
+.fleet-card-info-box {
+  margin: 14px 0 18px;
+  padding: 16px;
+  background: var(--surface-subtle);
+  border: 1px solid color-mix(in srgb, var(--nt-gold) 40%, var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.fleet-card-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.fleet-card-info-header span {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.fleet-card-info-header small {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.fleet-card-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  text-align: center;
+}
+
+.fleet-card-calc-grid small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.fleet-card-calc-grid strong {
+  display: block;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.fleet-card-alert {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+@media (max-width: 600px) {
+  .fleet-card-calc-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    text-align: left;
+  }
+  .fleet-card-calc-grid > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
