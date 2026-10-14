@@ -51,13 +51,12 @@ async function checkServiceMileageAlert(plate, currentMileage, driver = '') {
   const mileageNum = Number(currentMileage);
   if (isNaN(mileageNum) || mileageNum <= 0) return;
 
-  const interval = 10000; // รอบการเช็คสภาพทุก 10,000 กม.
-  const threshold = 500;  // แจ้งเตือนล่วงหน้า 500 กม.
+  const interval = 10000;
+  const threshold = 500;
 
   const remainder = mileageNum % interval;
   const remaining = remainder === 0 ? 0 : interval - remainder;
 
-  // ตรวจสอบว่าอยู่ในช่วงก่อนถึงรอบ 500 กม. หรือถึงรอบพอดี
   if (remaining <= threshold && remaining >= 0) {
     const nextMilestone = remainder === 0 ? mileageNum : mileageNum + remaining;
 
@@ -85,7 +84,6 @@ const SESSION_KEY = 'nt-fms-session';
 const OVER_BUDGET = 2000;
 const DASHBOARD_REFRESH_MS = 30000;
 
-// รายชื่อศูนย์ตามคอลัมน์ department ในตาราง vehicles
 const VEHICLE_DEPARTMENTS = [
   'ทั้งหมด',
   'สำนักงานหัวหิน',
@@ -327,6 +325,7 @@ function icon(name) {
     history: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2M3 12H1M5 5 3.5 3.5"></path></svg>`,
     table: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18M9 4v16M15 4v16"></path></svg>`,
     fuel: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M4 21h14M9 7h5v4H9zM17 8h2l2 2v7a2 2 0 0 1-4 0v-5"></path></svg>`,
+    creditCard: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>`,
     report: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h17"></path><path d="m7 15 4-4 3 3 6-7"></path></svg>`,
     audit: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>`,
     profile: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20c.9-3.4 3.4-5 7.5-5s6.6 1.6 7.5 5"></path></svg>`,
@@ -395,28 +394,13 @@ function vehicleFromUrl() {
 /* =========================================================
    AUTH SCREENS
    ========================================================= */
-function renderVehicleRequired() {
-  app.innerHTML = `
-    <main class="auth-page">
-      <section class="auth-card">
-        ${brand()}
-        <h1>กรุณาสแกน QR Code ประจำรถ</h1>
-        <p>ระบบต้องได้รับรหัสรถจาก QR Code ก่อนจึงจะอนุญาตให้เข้าสู่ระบบได้</p>
-        <div class="notice">
-          QR Code ของรถควรเชื่อมไปยัง URL ในรูปแบบ <strong>?vehicleId=CAR001</strong>
-        </div>
-      </section>
-    </main>
-  `;
-}
-
 function renderLoadingVehicle() {
   app.innerHTML = `
     <main class="auth-page">
       <section class="auth-card">
         ${brand()}
-        <h1>กำลังตรวจสอบข้อมูลรถ</h1>
-        <p>โปรดรอสักครู่ ระบบกำลังตรวจสอบข้อมูลกับฐานข้อมูล Supabase</p>
+        <h1>กำลังเข้าสู่ระบบ</h1>
+        <p>โปรดรอสักครู่ ระบบกำลังเชื่อมต่อฐานข้อมูล...</p>
       </section>
     </main>
   `;
@@ -429,7 +413,10 @@ function renderVehicleError(message) {
         ${brand()}
         <h1>ไม่สามารถเปิดรายการรถได้</h1>
         <p>${esc(message)}</p>
-        <p class="hint">โปรดสแกน QR Code ประจำรถอีกครั้ง หรือติดต่อผู้ดูแลระบบ</p>
+        <p class="hint">โปรดตรวจสอบ QR Code หรือเข้าสู่ระบบแบบทั่วไป</p>
+        <div class="button-row" style="margin-top: 16px;">
+          <button class="button button-full" onclick="window.location.href=window.location.pathname">เข้าสู่ระบบทั่วไป</button>
+        </div>
       </section>
     </main>
   `;
@@ -438,18 +425,29 @@ function renderVehicleError(message) {
 function renderLogin() {
   const vehicle = state.vehicle;
 
+  // หากสแกน QR Code มาให้แสดงข้อมูลรถ แต่หากเข้าแบบธรรมดาจะแสดงเป็นโหมดเข้าสู่ระบบทั่วไป
+  const vehicleInfoMarkup = vehicle
+    ? `
+      <div class="vehicle-card">
+        <span class="section-label">รถที่สแกน</span>
+        <strong>${esc(vehicle.plate)}</strong>
+        <p>${esc(vehicle.model)} / สถานะ: ${esc(vehicle.status)}</p>
+      </div>
+    `
+    : `
+      <div class="notice" style="margin: 16px 0; text-align: center;">
+        เข้าสู่ระบบบันทึกการใช้งานยานพาหนะส่วนกลาง
+      </div>
+    `;
+
   app.innerHTML = `
     <main class="auth-page">
       <section class="auth-card">
         ${brand()}
         <h1 style="text-align: center;">บันทึกการใช้งานรถจังหวัดประจวบคีรีขันธ์</h1>
-        <p>บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)</p>
+        <p style="text-align: center; margin-bottom: 8px;">บริษัท โทรคมนาคมแห่งชาติ จำกัด (มหาชน)</p>
 
-        <div class="vehicle-card">
-          <span class="section-label">รถที่สแกน</span>
-          <strong>${esc(vehicle.plate)}</strong>
-          <p>${esc(vehicle.model)} / สถานะ: ${esc(vehicle.status)}</p>
-        </div>
+        ${vehicleInfoMarkup}
 
         <form id="login-form">
           <div class="field">
@@ -538,6 +536,8 @@ function normalizeVehicle(vehicle) {
     model: vehicle.model,
     department: vehicle.department || '',
     status: vehicle.status || 'พร้อมใช้งาน',
+    fleetCardBalance: Number(vehicle.fleet_card_balance ?? vehicle.fleetCardBalance ?? 0),
+    fleetCardNumber: vehicle.fleet_card_number || vehicle.fleetCardNumber || '',
   };
 }
 
@@ -635,6 +635,7 @@ const navItems = {
     ['admin-usage', 'table', 'ประวัติใช้รถ'],
     ['admin-fuel', 'fuel', 'ประวัติน้ำมัน'],
     ['admin-service', 'history', 'เช็คระยะ'],
+    ['admin-fleet-card', 'creditCard', 'จัดการ Fleet Card'],
     ['admin-reports', 'report', 'รายงาน'],
     ['admin-users', 'profile', 'จัดการผู้ใช้'],
     ['admin-audit', 'audit', 'Audit Log'],
@@ -797,8 +798,8 @@ async function renderApp() {
 
           <div class="user-actions">
             <div class="vehicle-pill">
-              <span>รถที่สแกน</span>
-              <strong>${esc(state.vehicle?.plate || '-')}</strong>
+              <span>รถที่ใช้งาน</span>
+              <strong>${esc(state.vehicle?.plate || 'เลือกรายคัน')}</strong>
             </div>
 
             <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="${nextThemeLabel}">
@@ -981,6 +982,7 @@ function getVehicle(plate) {
 }
 
 function vehicleOptions(selected = '') {
+  // หากสแกน QR Code มาจะล็อกเฉพาะรถคันนั้น แต่ถ้าล็อกอินทั่วไปจะให้เลือกได้ทุกคัน
   const visibleVehicles = state.role === 'user' && state.vehicle ? [state.vehicle] : db.vehicles;
 
   return visibleVehicles
@@ -1077,6 +1079,9 @@ async function usageForm(record = {}, context = 'user') {
 async function fuelForm(record = {}, context = 'user') {
   const plate = record.plate || state.vehicle?.plate || db.vehicles[0]?.plate || '';
   const currentMileage = record.mileage || (await latestMileage(plate)) || '';
+  const vehicleObj = getVehicle(plate);
+  const cardBalance = vehicleObj?.fleetCardBalance ?? 0;
+  const currentPayment = record.payment || 'Fleet Card';
 
   return `
     <form class="record-form" data-kind="fuel" data-context="${context}" data-id="${record.id || ''}">
@@ -1091,7 +1096,7 @@ async function fuelForm(record = {}, context = 'user') {
         </div>
         <div class="field">
           <label>ทะเบียนรถ</label>
-          <select required name="plate">${vehicleOptions(plate)}</select>
+          <select required name="plate" id="fuel-plate-select">${vehicleOptions(plate)}</select>
         </div>
         <div class="field">
           <label>เลขไมล์ขณะเติม</label>
@@ -1111,17 +1116,43 @@ async function fuelForm(record = {}, context = 'user') {
         </div>
         <div class="field">
           <label>จำนวนเงินรวม (บาท)</label>
-          <input required min="0" step="0.01" type="number" name="amount" value="${record.amount || ''}" />
+          <input required min="0" step="0.01" type="number" name="amount" id="fuel-amount-input" value="${record.amount || ''}" />
         </div>
         <div class="field">
           <label>วิธีชำระเงิน</label>
-          <select required name="payment">
-            <option value="Fleet Card" ${record.payment === 'Fleet Card' ? 'selected' : ''}>Fleet Card</option>
-            <option value="เงินสด" ${record.payment === 'เงินสด' ? 'selected' : ''}>เงินสด</option>
-            <option value="โอน" ${record.payment === 'โอน' ? 'selected' : ''}>โอน</option>
+          <select required name="payment" id="fuel-payment-select">
+            <option value="Fleet Card" ${currentPayment === 'Fleet Card' ? 'selected' : ''}>Fleet Card</option>
+            <option value="เงินสด" ${currentPayment === 'เงินสด' ? 'selected' : ''}>เงินสด</option>
+            <option value="โอน" ${currentPayment === 'โอน' ? 'selected' : ''}>โอน</option>
           </select>
         </div>
       </div>
+
+      <!-- กล่องแสดงสถานะและคำนวณยอดเงิน Fleet Card แบบ Real-time -->
+      <div id="fleet-card-status-box" class="fleet-card-info-box" style="${currentPayment === 'Fleet Card' ? '' : 'display: none;'}">
+        <div class="fleet-card-info-header">
+          <span>💳 ข้อมูลบัตร Fleet Card ประจำรถ (<span id="fleet-card-plate-display">${esc(plate)}</span>)</span>
+          <small id="fleet-card-number-display">${vehicleObj?.fleetCardNumber ? `เลขบัตร: ${esc(vehicleObj.fleetCardNumber)}` : 'บัตรประจำคัน'}</small>
+        </div>
+        <div class="fleet-card-calc-grid">
+          <div>
+            <small>ยอดเงินในบัตรปัจจุบัน</small>
+            <strong id="fleet-card-current-bal">${money(cardBalance)}</strong>
+          </div>
+          <div>
+            <small>ยอดที่เติมครั้งนี้</small>
+            <strong id="fleet-card-fill-amount" style="color: var(--danger);">-฿0</strong>
+          </div>
+          <div>
+            <small>ยอดเงินคงเหลือหลังเติม</small>
+            <strong id="fleet-card-remaining-bal" style="color: var(--success);">${money(cardBalance)}</strong>
+          </div>
+        </div>
+        <div id="fleet-card-warning" class="fleet-card-alert" style="display: none;">
+          ⚠️ ยอดเงินใน Fleet Card ไม่เพียงพอสำหรับการเติมครั้งนี้ (ยอดคงเหลือติดลบ)
+        </div>
+      </div>
+
       <div class="field">
         <label>อัปโหลดรูปสลิปใบเสร็จ</label>
         <input type="file" accept="image/*" name="receiptFile" />
@@ -1181,7 +1212,7 @@ async function renderEntry(context = 'user') {
 
   const titleMap = { usage: 'บันทึกการใช้รถ', fuel: 'บันทึกเติมน้ำมัน', service: 'บันทึกเช็คระยะ' };
   const title = context === 'admin' ? 'บันทึกข้อมูล' : titleMap[tab] || 'บันทึกข้อมูลรถส่วนกลาง';
-  const description = context === 'admin' ? 'ผู้ดูแลระบบสามารถบันทึกข้อมูลแทนพนักงานได้' : 'บันทึกข้อมูลสำหรับรถที่เลือกจาก QR Code';
+  const description = context === 'admin' ? 'ผู้ดูแลระบบสามารถบันทึกข้อมูลแทนพนักงานได้' : (state.vehicle ? 'บันทึกข้อมูลสำหรับรถที่สแกนจาก QR Code' : 'บันทึกข้อมูลการใช้งานยานพาหนะส่วนกลาง');
 
   const form =
     tab === 'usage'
@@ -1197,12 +1228,14 @@ async function renderEntry(context = 'user') {
         <div class="card-header">
           <div>
             <h3>รถที่กำลังบันทึก</h3>
-            <p>ข้อมูลรถจาก QR Code</p>
+            <p>${state.vehicle ? 'ข้อมูลรถจาก QR Code ที่สแกน' : 'เลือกเปลี่ยนทะเบียนรถได้จากฟอร์มบันทึก'}</p>
           </div>
-          <span class="status-dot-label"><i></i>${esc(state.vehicle?.status || 'พร้อมใช้งาน')}</span>
+          <span class="status-dot-label"><i></i>${esc((getVehicle(selectedPlate) || state.vehicle)?.status || 'พร้อมใช้งาน')}</span>
         </div>
-        ${renderVehicleCard(selectedPlate)}
-        ${context === 'user' ? `<p class="hint">พนักงานไม่สามารถเปลี่ยนรถในรายการได้ เนื่องจากรถถูกระบุจาก QR Code ที่สแกน</p>` : ''}
+        <div id="active-vehicle-card-area">
+          ${renderVehicleCard(selectedPlate)}
+        </div>
+        ${context === 'user' && state.vehicle ? `<p class="hint">พนักงานไม่สามารถเปลี่ยนรถในรายการได้ เนื่องจากรถถูกระบุจาก QR Code ที่สแกน</p>` : ''}
       </section>
 
       <section class="card record-card">
@@ -1230,13 +1263,71 @@ function bindEntry(context) {
     });
   });
 
-  document.querySelector('.record-form')?.addEventListener('submit', saveRecord);
+  const form = document.querySelector('.record-form');
+  form?.addEventListener('submit', saveRecord);
+
+  // การคำนวณและอัปเดตยอด Fleet Card แบบ Real-time
+  const updateFleetCardDisplay = () => {
+    const paymentSelect = document.querySelector('#fuel-payment-select');
+    const plateSelect = document.querySelector('[name=plate]');
+    const amountInput = document.querySelector('#fuel-amount-input');
+    const box = document.querySelector('#fleet-card-status-box');
+    if (!box || !paymentSelect) return;
+
+    if (paymentSelect.value !== 'Fleet Card') {
+      box.style.display = 'none';
+      return;
+    }
+
+    box.style.display = 'block';
+    const plate = plateSelect?.value || state.vehicle?.plate || '';
+    const vehicleObj = getVehicle(plate);
+    const balance = Number(vehicleObj?.fleetCardBalance || 0);
+    const amount = Number(amountInput?.value || 0);
+    const remaining = balance - amount;
+
+    const plateDisplay = document.querySelector('#fleet-card-plate-display');
+    const numDisplay = document.querySelector('#fleet-card-number-display');
+    const currentBalEl = document.querySelector('#fleet-card-current-bal');
+    const fillAmountEl = document.querySelector('#fleet-card-fill-amount');
+    const remBalEl = document.querySelector('#fleet-card-remaining-bal');
+    const warningEl = document.querySelector('#fleet-card-warning');
+
+    if (plateDisplay) plateDisplay.textContent = plate;
+    if (numDisplay) numDisplay.textContent = vehicleObj?.fleetCardNumber ? `เลขบัตร: ${vehicleObj.fleetCardNumber}` : 'บัตรประจำคัน';
+    if (currentBalEl) currentBalEl.textContent = money(balance);
+    if (fillAmountEl) fillAmountEl.textContent = amount > 0 ? `-${money(amount)}` : '฿0';
+
+    if (remBalEl) {
+      remBalEl.textContent = money(remaining);
+      remBalEl.style.color = remaining < 0 ? 'var(--danger)' : 'var(--success)';
+    }
+
+    if (warningEl) {
+      warningEl.style.display = remaining < 0 ? 'block' : 'none';
+    }
+  };
+
+  document.querySelector('#fuel-payment-select')?.addEventListener('change', updateFleetCardDisplay);
+  document.querySelector('#fuel-amount-input')?.addEventListener('input', updateFleetCardDisplay);
+
   document.querySelector('[name=plate]')?.addEventListener('change', async (event) => {
+    const selectedPlate = event.target.value;
     const input = document.querySelector('[name=startMileage], [name=mileage]');
     if (input) {
-      input.value = (await latestMileage(event.target.value)) || '';
+      input.value = (await latestMileage(selectedPlate)) || '';
     }
+    
+    // อัปเดตกล่องแสดงข้อมูลรถด้านบนตามทะเบียนที่เลือก
+    const cardArea = document.querySelector('#active-vehicle-card-area');
+    if (cardArea) {
+      cardArea.innerHTML = renderVehicleCard(selectedPlate);
+    }
+
+    updateFleetCardDisplay();
   });
+
+  updateFleetCardDisplay();
 }
 
 /* =========================================================
@@ -1260,6 +1351,7 @@ async function saveRecord(event) {
     return toast('ไม่พบรหัสพนักงาน กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'error');
   }
 
+  // หากสแกน QR Code มาให้ใช้ทะเบียนที่สแกน แต่ถ้าไม่ได้สแกนให้ใช้ทะเบียนที่เลือกจากฟอร์ม
   if (state.role === 'user' && state.vehicle) {
     record.plate = state.vehicle.plate;
   }
@@ -1350,6 +1442,29 @@ async function saveRecord(event) {
       } else {
         const { error } = await supabaseClient.from('fuels').insert(payload);
         if (error) throw error;
+
+        // หักเงินในบัตร Fleet Card เมื่อเลือกวิธีชำระเป็น Fleet Card
+        let remainingFleetBalance = null;
+        if (record.payment === 'Fleet Card') {
+          const targetVehicle = getVehicle(record.plate);
+          const currentBal = Number(targetVehicle?.fleetCardBalance || 0);
+          remainingFleetBalance = currentBal - Number(record.amount);
+
+          const { error: vError } = await supabaseClient
+            .from('vehicles')
+            .update({ fleet_card_balance: remainingFleetBalance })
+            .eq('plate', record.plate);
+
+          if (vError) {
+            console.error('หักเงิน Fleet Card ไม่สำเร็จ:', vError);
+          } else {
+            if (targetVehicle) targetVehicle.fleetCardBalance = remainingFleetBalance;
+            await addAudit(
+              'หักเงิน Fleet Card',
+              `รถทะเบียน ${record.plate} เติมน้ำมัน ฿${record.amount.toLocaleString()} | คงเหลือ ฿${remainingFleetBalance.toLocaleString()}`
+            );
+          }
+        }
       }
     } else if (kind === 'service') {
       const payload = {
@@ -1370,7 +1485,6 @@ async function saveRecord(event) {
       }
     }
 
-    // ส่งแจ้งเตือนเข้า Telegram สำหรับรายการที่เพิ่มใหม่ (ระบุวันที่)
     if (isNew) {
       let telegramMsg = '';
       const formattedDate = thaiDate(record.date);
@@ -1389,6 +1503,11 @@ async function saveRecord(event) {
           `<b>วัตถุประสงค์:</b> ${record.purpose}\n` +
           (record.note ? `<b>หมายเหตุ:</b> ${record.note}\n` : '');
       } else if (kind === 'fuel') {
+        const vehicleObj = getVehicle(record.plate);
+        const cardBalText = record.payment === 'Fleet Card'
+          ? `\n💳 <b>ยอดคงเหลือ Fleet Card:</b> ${money(vehicleObj?.fleetCardBalance || 0)}`
+          : '';
+
         telegramMsg =
           `⛽ <b>มีบันทึกการเติมน้ำมันใหม่</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
@@ -1398,7 +1517,7 @@ async function saveRecord(event) {
           `<b>ประเภท:</b> ${record.type}\n` +
           `<b>จำนวน:</b> ${Number(record.liters).toFixed(2)} ลิตร\n` +
           `<b>ยอดเงิน:</b> ${Number(record.amount).toLocaleString()} บาท\n` +
-          `<b>ชำระโดย:</b> ${record.payment}\n` +
+          `<b>ชำระโดย:</b> ${record.payment}${cardBalText}\n` +
           `<b>เลขไมล์:</b> ${record.mileage.toLocaleString()} กม.\n` +
           (record.receipt ? `<b>แนบสลิป:</b> มีรูปหลักฐานแนบแล้ว\n` : '');
       } else if (kind === 'service') {
@@ -1417,9 +1536,6 @@ async function saveRecord(event) {
         await sendTelegramNotification(telegramMsg);
       }
 
-      // ---------------------------------------------------------
-      // ตรวจสอบการแจ้งเตือนเช็คระยะทุกๆ 10,000 กม. (แจ้งเตือนล่วงหน้า 500 กม.)
-      // ---------------------------------------------------------
       if (kind === 'usage' && record.endMileage) {
         await checkServiceMileageAlert(record.plate, record.endMileage, record.driver);
       } else if (kind === 'fuel' && record.mileage) {
@@ -1623,7 +1739,7 @@ function renderProfile() {
           </div>
           <div class="profile-info-row">
             <span>รถที่กำลังใช้งาน</span>
-            <strong>${esc(state.vehicle?.plate || '-')}</strong>
+            <strong>${esc(state.vehicle?.plate || 'เลือกรายคัน')}</strong>
           </div>
           <div class="profile-info-row">
             <span>Last login</span>
@@ -2222,6 +2338,311 @@ function bindServiceDeleteButtons() {
         toast('ลบไม่สำเร็จ: ' + err.message, 'error');
       }
     });
+  });
+}
+
+/* =========================================================
+   ADMIN FLEET CARD MANAGEMENT (ฟังก์ชันแอดมินจัดการงบประมาณ Fleet Card)
+   ========================================================= */
+function renderAdminFleetCards() {
+  const page = document.querySelector('#page');
+  const vehicles = db.vehicles || [];
+
+  const totalBudget = vehicles.reduce((sum, v) => sum + Number(v.fleetCardBalance || 0), 0);
+  const totalCards = vehicles.filter((v) => Number(v.fleetCardBalance || 0) > 0 || v.fleetCardNumber).length;
+
+  const rows = vehicles
+    .map(
+      (v) => `
+      <tr>
+        <td class="fw-bold text-primary">${esc(v.plate)}</td>
+        <td>${esc(v.model || '-')}</td>
+        <td>${esc(v.department || '-')}</td>
+        <td>${v.fleetCardNumber ? `<code>${esc(v.fleetCardNumber)}</code>` : '<span style="color:var(--muted-foreground);">-</span>'}</td>
+        <td style="font-weight: 750; font-size: 0.9rem; color: ${v.fleetCardBalance <= 500 ? 'var(--danger)' : 'var(--success)'};">
+          ${money(v.fleetCardBalance || 0)}
+        </td>
+        <td>
+          <button class="button" data-fleet-manage="${esc(v.plate)}" type="button">
+            💳 เติมเงิน / ปรับยอด
+          </button>
+        </td>
+      </tr>
+    `,
+    )
+    .join('');
+
+  page.innerHTML = `
+    ${pageHead('จัดการงบประมาณ Fleet Card', 'ตรวจสอบยอดเงินในบัตรเติมน้ำมันประจำรถแต่ละคัน เพิ่มหรือลดวงเงินงบประมาณได้ตลอดเวลา')}
+    
+    <div class="grid dashboard" style="margin-bottom: 20px;">
+      <article class="stat-card">
+        <div class="label">ยอดเงินงบประมาณรวมทุกคัน</div>
+        <div class="value" style="color: var(--success);">${money(totalBudget)}</div>
+        <div class="sub">จำนวนรถทั้งหมด ${vehicles.length} คัน</div>
+      </article>
+
+      <article class="stat-card">
+        <div class="label">บัตร Fleet Card ที่มีวงเงิน</div>
+        <div class="value">${number(totalCards)} ใบ</div>
+        <div class="sub">พร้อมใช้งานสำหรับการเติมน้ำมัน</div>
+      </article>
+    </div>
+
+    <section class="card">
+      <div class="filter-bar">
+        <input id="fleet-card-search" placeholder="ค้นหาตามทะเบียน, รุ่นรถ, ศูนย์..." />
+        <button class="ghost-button" id="refresh-fleet-cards" type="button">↻ รีเฟรชข้อมูล</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ทะเบียนรถ</th>
+              <th>รุ่นรถ</th>
+              <th>สังกัด / ศูนย์</th>
+              <th>เลขที่บัตร Fleet Card</th>
+              <th>ยอดเงินคงเหลือในบัตร</th>
+              <th style="width: 170px;">การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="fleet-card-table-body">${rows || `<tr><td colspan="6" class="empty">ไม่พบข้อมูลรถในระบบ</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+
+  document.querySelectorAll('[data-fleet-manage]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const plate = btn.dataset.fleetManage;
+      const vehicle = getVehicle(plate);
+      if (vehicle) openFleetCardModal(vehicle);
+    });
+  });
+
+  document.querySelector('#refresh-fleet-cards')?.addEventListener('click', async () => {
+    await syncRemoteData();
+    renderAdminFleetCards();
+    toast('อัปเดตข้อมูลงบประมาณ Fleet Card แล้ว');
+  });
+
+  document.querySelector('#fleet-card-search')?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    const filtered = vehicles.filter(
+      (v) =>
+        v.plate.toLowerCase().includes(query) ||
+        (v.model || '').toLowerCase().includes(query) ||
+        (v.department || '').toLowerCase().includes(query) ||
+        (v.fleetCardNumber || '').toLowerCase().includes(query)
+    );
+
+    const tbody = document.querySelector('#fleet-card-table-body');
+    if (!tbody) return;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">ไม่พบข้อมูลตามคำค้นหา</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered
+      .map(
+        (v) => `
+        <tr>
+          <td class="fw-bold text-primary">${esc(v.plate)}</td>
+          <td>${esc(v.model || '-')}</td>
+          <td>${esc(v.department || '-')}</td>
+          <td>${v.fleetCardNumber ? `<code>${esc(v.fleetCardNumber)}</code>` : '<span style="color:var(--muted-foreground);">-</span>'}</td>
+          <td style="font-weight: 750; font-size: 0.9rem; color: ${v.fleetCardBalance <= 500 ? 'var(--danger)' : 'var(--success)'};">
+            ${money(v.fleetCardBalance || 0)}
+          </td>
+          <td>
+            <button class="button" data-fleet-manage="${esc(v.plate)}" type="button">
+              💳 เติมเงิน / ปรับยอด
+            </button>
+          </td>
+        </tr>
+      `,
+      )
+      .join('');
+
+    tbody.querySelectorAll('[data-fleet-manage]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const plate = btn.dataset.fleetManage;
+        const vehicle = getVehicle(plate);
+        if (vehicle) openFleetCardModal(vehicle);
+      });
+    });
+  });
+}
+
+function openFleetCardModal(vehicle) {
+  const modalId = 'fleet-card-modal';
+  document.getElementById(modalId)?.remove();
+
+  const currentBal = Number(vehicle.fleetCardBalance || 0);
+
+  const modalHtml = `
+    <div class="modal" id="${modalId}" role="dialog" aria-modal="true">
+      <div class="modal-panel" style="max-width: 500px;">
+        <div class="modal-head">
+          <div>
+            <div class="eyebrow">จัดการงบประมาณบัตรน้ำมัน</div>
+            <h3>รถทะเบียน: ${esc(vehicle.plate)}</h3>
+          </div>
+          <button class="icon-button icon-button-compact" id="close-fleet-modal" type="button">✕</button>
+        </div>
+
+        <div style="margin: 16px 0; padding: 14px; background: var(--surface-subtle); border-radius: var(--radius); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.82rem; color: var(--muted-foreground);">ยอดเงินคงเหลือปัจจุบัน:</span>
+            <strong style="font-size: 1.25rem; color: var(--primary);">${money(currentBal)}</strong>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 4px;">
+            สังกัด: ${esc(vehicle.department || '-')} | รุ่น: ${esc(vehicle.model || '-')}
+          </div>
+        </div>
+
+        <form id="fleet-adjust-form">
+          <div class="field">
+            <label>รูปแบบการปรับยอดเงิน</label>
+            <select name="actionType" id="fleet-action-type" required>
+              <option value="topup">➕ เติมเงินเข้าบัตร (เพิ่มยอด)</option>
+              <option value="deduct">➖ ตัดเงิน/ลดงบประมาณ (ลดยอด)</option>
+              <option value="set">⚙️ กำหนดค่ายอดเงินคงเหลือโดยตรง (Set Balance)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label id="fleet-amount-label">จำนวนเงินที่ต้องการเติม (บาท)</label>
+            <input required type="number" min="0" step="0.01" name="amount" id="modal-adjust-amount" placeholder="ระบุจำนวนเงิน (บาท)" autofocus />
+          </div>
+
+          <div class="field">
+            <label>เลขที่บัตร Fleet Card (ถ้ามี)</label>
+            <input type="text" name="cardNumber" value="${esc(vehicle.fleetCardNumber || '')}" placeholder="เช่น 7001-XXXX-XXXX-XXXX" />
+          </div>
+
+          <div class="field">
+            <label>หมายเหตุ / เหตุผลการปรับยอด</label>
+            <input type="text" name="note" placeholder="เช่น เติมงบประจำเดือน, โอนย้ายงบประมาณ" />
+          </div>
+
+          <div style="margin-top: 10px; padding: 10px; background: var(--accent); border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--nt-gold) 30%, var(--border));">
+            <span style="font-size: 0.78rem; color: var(--accent-foreground); display: block;">
+              ยอดเงินใหม่หลังบันทึก: <strong id="preview-new-balance" style="font-size: 1rem;">${money(currentBal)}</strong>
+            </span>
+          </div>
+
+          <div class="button-row" style="margin-top: 20px; justify-content: flex-end;">
+            <button class="ghost-button" id="cancel-fleet-modal" type="button">ยกเลิก</button>
+            <button class="button" id="submit-fleet-modal" type="submit">บันทึกยอดเงิน</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const form = document.querySelector('#fleet-adjust-form');
+  const actionTypeSelect = document.querySelector('#fleet-action-type');
+  const amountInput = document.querySelector('#modal-adjust-amount');
+  const amountLabel = document.querySelector('#fleet-amount-label');
+  const previewEl = document.querySelector('#preview-new-balance');
+
+  const updatePreview = () => {
+    const action = actionTypeSelect.value;
+    const val = Number(amountInput.value || 0);
+    let newBal = currentBal;
+
+    if (action === 'topup') {
+      amountLabel.textContent = 'จำนวนเงินที่ต้องการเติม (บาท)';
+      newBal = currentBal + val;
+    } else if (action === 'deduct') {
+      amountLabel.textContent = 'จำนวนเงินที่ต้องการตัดออก/ลด (บาท)';
+      newBal = currentBal - val;
+    } else if (action === 'set') {
+      amountLabel.textContent = 'กำหนดยอดคงเหลือใหม่เป็น (บาท)';
+      newBal = val;
+    }
+
+    previewEl.textContent = money(newBal);
+    previewEl.style.color = newBal < 0 ? 'var(--danger)' : 'var(--primary)';
+  };
+
+  actionTypeSelect.addEventListener('change', updatePreview);
+  amountInput.addEventListener('input', updatePreview);
+
+  const closeModal = () => document.getElementById(modalId)?.remove();
+  document.querySelector('#close-fleet-modal')?.addEventListener('click', closeModal);
+  document.querySelector('#cancel-fleet-modal')?.addEventListener('click', closeModal);
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.querySelector('#submit-fleet-modal');
+    btn.disabled = true;
+    btn.textContent = 'กำลังบันทึกลงฐานข้อมูล...';
+
+    const fd = new FormData(e.currentTarget);
+    const action = fd.get('actionType');
+    const val = Number(fd.get('amount') || 0);
+    const cardNumber = String(fd.get('cardNumber') || '').trim();
+    const note = String(fd.get('note') || '').trim();
+
+    let newBal = currentBal;
+    let actionDesc = '';
+
+    if (action === 'topup') {
+      newBal = currentBal + val;
+      actionDesc = `เติมเงิน ฿${val.toLocaleString()}`;
+    } else if (action === 'deduct') {
+      newBal = currentBal - val;
+      actionDesc = `ตัดเงิน ฿${val.toLocaleString()}`;
+    } else {
+      newBal = val;
+      actionDesc = `กำหนดยอดเงินเป็น ฿${val.toLocaleString()}`;
+    }
+
+    try {
+      if (!supabaseClient) throw new Error('ไม่ได้เชื่อมต่อกับ Supabase');
+
+      const { error } = await supabaseClient
+        .from('vehicles')
+        .update({
+          fleet_card_balance: newBal,
+          fleet_card_number: cardNumber,
+        })
+        .eq('plate', vehicle.plate);
+
+      if (error) throw error;
+
+      vehicle.fleetCardBalance = newBal;
+      vehicle.fleetCardNumber = cardNumber;
+
+      const auditMsg = `${actionDesc} | รถทะเบียน ${vehicle.plate} (ยอดเดิม ฿${currentBal.toLocaleString()} -> ยอดใหม่ ฿${newBal.toLocaleString()})${note ? ` [${note}]` : ''}`;
+      await addAudit('ปรับยอดเงิน Fleet Card', auditMsg);
+
+      const tgMsg =
+        `💳 <b>มีการปรับยอดเงินงบประมาณ Fleet Card</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `🚗 <b>ทะเบียนรถ:</b> ${vehicle.plate}\n` +
+        `<b>การดำเนินการ:</b> ${actionDesc}\n` +
+        `<b>ยอดเงินคงเหลือใหม่:</b> ${money(newBal)}\n` +
+        `<b>ผู้ดำเนินการ:</b> ${state.user?.name || 'แอดมิน'}\n` +
+        (note ? `<b>หมายเหตุ:</b> ${note}\n` : '');
+      await sendTelegramNotification(tgMsg);
+
+      toast('ปรับปรุงยอดเงิน Fleet Card สำเร็จ');
+      closeModal();
+      await syncRemoteData();
+      renderAdminFleetCards();
+    } catch (err) {
+      console.error('Update Fleet Card balance error:', err);
+      toast('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถบันทึกได้'), 'error');
+      btn.disabled = false;
+      btn.textContent = 'บันทึกยอดเงิน';
+    }
   });
 }
 
@@ -2900,6 +3321,7 @@ async function renderView() {
   if (state.view === 'admin-usage') return adminTable('usage');
   if (state.view === 'admin-fuel') return adminTable('fuel');
   if (state.view === 'admin-service') return adminServiceTable();
+  if (state.view === 'admin-fleet-card') return renderAdminFleetCards();
   if (state.view === 'admin-reports') return renderReports();
   if (state.view === 'admin-users') return await renderAdminUsers();
   if (state.view === 'admin-audit') return renderAudit();
@@ -2913,91 +3335,85 @@ async function renderView() {
 async function bootstrap() {
   const vehicleId = vehicleFromUrl();
 
-  if (!vehicleId) {
-    return renderVehicleRequired();
-  }
+  // ถ้ามีการระบุ vehicleId ผ่าน URL (เช่น จากการสแกน QR Code)
+  if (vehicleId) {
+    renderLoadingVehicle();
+    try {
+      if (supabaseClient) {
+        const { data } = await supabaseClient
+          .from('vehicles')
+          .select('*')
+          .or(`plate.eq.${vehicleId},vehicle_id.eq.${vehicleId}`)
+          .maybeSingle();
 
-  renderLoadingVehicle();
-
-  try {
-    let vehicle = null;
-
-    if (supabaseClient) {
-      const { data } = await supabaseClient
-        .from('vehicles')
-        .select('*')
-        .or(`plate.eq.${vehicleId},vehicle_id.eq.${vehicleId}`)
-        .maybeSingle();
-
-      if (data) vehicle = data;
-    }
-
-    if (!vehicle) {
-      throw new Error('ไม่พบข้อมูลรถจาก QR Code นี้ในระบบคลาวด์');
-    }
-
-    state.vehicle = normalizeVehicle(vehicle);
-
-    if (state.vehicle.status === 'กำลังซ่อมบำรุง') {
-      throw new Error(`รถ ${state.vehicle.plate} อยู่ระหว่างซ่อมบำรุง`);
-    }
-
-    await syncRemoteData();
-
-    const savedUser = localStorage.getItem('nt-fms-user');
-    const savedSession = localStorage.getItem(SESSION_KEY);
-
-    let restoredUser = null;
-    if (savedUser && savedSession) {
-      try {
-        restoredUser = JSON.parse(savedUser);
-      } catch (parseError) {
-        localStorage.removeItem('nt-fms-user');
-        localStorage.removeItem(SESSION_KEY);
-        restoredUser = null;
-      }
-    }
-
-    if (restoredUser?.employeeId) {
-      state.user = restoredUser;
-      state.sessionToken = savedSession;
-      state.role = restoredUser.role || 'user';
-
-      try {
-        if (supabaseClient) {
-          const { data: empData } = await supabaseClient
-            .from('employees')
-            .select('profile_image, name, role, phone')
-            .eq('employee_id', restoredUser.employeeId)
-            .maybeSingle();
-
-          if (empData) {
-            if (empData.profile_image) {
-              state.user.profileImage = `${empData.profile_image.split('?')[0]}?t=${Date.now()}`;
-            }
-            if (empData.name) state.user.name = empData.name;
-            if (empData.role) {
-              state.user.role = empData.role;
-              state.role = empData.role;
-            }
-            if (empData.phone !== undefined) state.user.phone = empData.phone || '';
-
-            localStorage.setItem('nt-fms-user', JSON.stringify(state.user));
+        if (data) {
+          state.vehicle = normalizeVehicle(data);
+          if (state.vehicle.status === 'กำลังซ่อมบำรุง') {
+            return renderVehicleError(`รถ ${state.vehicle.plate} อยู่ระหว่างซ่อมบำรุง`);
           }
         }
-      } catch (e) {
-        console.warn('Refresh user info warning:', e);
       }
+    } catch (error) {
+      console.warn('โหลดข้อมูลรถจาก QR Code ไม่สำเร็จ:', error);
+    }
+  } else {
+    // โหมดเข้าสู่ระบบทั่วไป ไม่ระบุเจาะจงรถ
+    state.vehicle = null;
+  }
 
-      state.view = state.role === 'admin' ? 'admin-dashboard' : 'user-entry';
-      await renderApp();
-      return;
+  await syncRemoteData();
+
+  const savedUser = localStorage.getItem('nt-fms-user');
+  const savedSession = localStorage.getItem(SESSION_KEY);
+
+  let restoredUser = null;
+  if (savedUser && savedSession) {
+    try {
+      restoredUser = JSON.parse(savedUser);
+    } catch (parseError) {
+      localStorage.removeItem('nt-fms-user');
+      localStorage.removeItem(SESSION_KEY);
+      restoredUser = null;
+    }
+  }
+
+  if (restoredUser?.employeeId) {
+    state.user = restoredUser;
+    state.sessionToken = savedSession;
+    state.role = restoredUser.role || 'user';
+
+    try {
+      if (supabaseClient) {
+        const { data: empData } = await supabaseClient
+          .from('employees')
+          .select('profile_image, name, role, phone')
+          .eq('employee_id', restoredUser.employeeId)
+          .maybeSingle();
+
+        if (empData) {
+          if (empData.profile_image) {
+            state.user.profileImage = `${empData.profile_image.split('?')[0]}?t=${Date.now()}`;
+          }
+          if (empData.name) state.user.name = empData.name;
+          if (empData.role) {
+            state.user.role = empData.role;
+            state.role = empData.role;
+          }
+          if (empData.phone !== undefined) state.user.phone = empData.phone || '';
+
+          localStorage.setItem('nt-fms-user', JSON.stringify(state.user));
+        }
+      }
+    } catch (e) {
+      console.warn('Refresh user info warning:', e);
     }
 
-    renderLogin();
-  } catch (error) {
-    renderVehicleError(error.message || 'ไม่สามารถตรวจสอบรถจากฐานข้อมูลได้');
+    state.view = state.role === 'admin' ? 'admin-dashboard' : 'user-entry';
+    await renderApp();
+    return;
   }
+
+  renderLogin();
 }
 
 /* =========================================================
